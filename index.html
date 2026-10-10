@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6fb8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Угаалга">
+<title>Угаалгын бүртгэл</title>
+<style>
+:root{
+  --bg:#f3f6f9; --card:#ffffff; --text:#16212b; --muted:#6a7885; --line:#dfe6ec;
+  --brand:#0f6fb8; --brand-ink:#ffffff; --soft:#e6f1fa; --danger:#c8372d; --ok:#1d8a4e;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0e151b; --card:#17212a; --text:#e8eef3; --muted:#93a2af; --line:#283642;
+    --brand:#3d9be0; --brand-ink:#06131d; --soft:#1c3345; --danger:#ef6a60; --ok:#4cc483;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;font-size:16px;line-height:1.4}
+body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+header{background:var(--brand);color:var(--brand-ink);padding:14px 16px;position:sticky;top:0;z-index:5;
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+header h1{font-size:18px;margin:0;font-weight:700}
+header .today{font-size:13px;opacity:.9;white-space:nowrap}
+main{padding:14px 16px;max-width:640px;margin:0 auto}
+.page{display:none}.page.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px;font-weight:600}
+label:first-child{margin-top:0}
+input,select,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);
+  border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
+#plate{font-size:22px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;
+  padding:11px 13px;font:inherit;min-height:46px;cursor:pointer;text-align:left}
+.chip small{display:block;color:var(--muted);font-size:12px}
+.chip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.chip.on small{color:var(--brand-ink);opacity:.85}
+.btn{width:100%;border:0;border-radius:12px;padding:15px;font:inherit;font-weight:700;font-size:17px;
+  background:var(--brand);color:var(--brand-ink);margin-top:16px;cursor:pointer;min-height:52px}
+.btn.ghost{background:transparent;color:var(--brand);border:1px solid var(--line);font-size:15px;font-weight:600;margin-top:8px}
+.btn.red{background:transparent;color:var(--danger);border:1px solid var(--line);font-size:15px;font-weight:600;margin-top:8px}
+.hint{font-size:13px;color:var(--muted);margin-top:6px}
+.hint b{color:var(--ok)}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.rec{display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.rec:last-child{border-bottom:0}
+.rec .p{font-weight:700;font-size:17px;letter-spacing:.5px}
+.rec .s{font-size:13px;color:var(--muted)}
+.rec .amt{font-weight:700;white-space:nowrap;text-align:right}
+.rec .amt small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:20px;font-weight:700;margin-top:2px}
+.stat.wide{grid-column:1/3}
+h2{font-size:15px;margin:0 0 8px}
+.bar{margin:9px 0}
+.bar .t{display:flex;justify-content:space-between;font-size:14px;gap:8px}
+.bar .t span:last-child{white-space:nowrap;font-weight:600}
+.bar .g{height:7px;background:var(--soft);border-radius:4px;margin-top:4px;overflow:hidden}
+.bar .g i{display:block;height:100%;background:var(--brand);border-radius:4px}
+.empty{color:var(--muted);text-align:center;padding:22px 0;font-size:14px}
+.setrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.setrow input{min-height:44px;padding:9px 10px}
+.setrow .pr{max-width:110px}
+.x{border:1px solid var(--line);background:transparent;color:var(--danger);border-radius:10px;
+  min-width:44px;min-height:44px;font-size:18px;cursor:pointer}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;
+  padding:9px 2px 10px;cursor:pointer;min-height:60px}
+nav button b{display:block;font-size:20px;font-weight:400;line-height:1.2}
+nav button.on{color:var(--brand);font-weight:700}
+#toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--text);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:90%;text-align:center}
+#toast.on{opacity:1}
+#warn{display:none;background:var(--danger);color:#fff;padding:10px 16px;font-size:14px}
+</style>
+</head>
+<body>
+<header><h1>Угаалгын бүртгэл</h1><div class="today" id="hdrDate"></div></header>
+<div id="warn">Анхаар: энэ хөтөч өгөгдлийг хадгалж чадахгүй байна. Бүртгэл хаагдахад устана. Файлыг Chrome эсвэл Safari-аар нээнэ үү.</div>
+
+<main>
+<!-- БҮРТГЭХ -->
+<section class="page on" id="p-add">
+  <div class="card">
+    <label for="plate">Улсын дугаар</label>
+    <input id="plate" autocomplete="off" autocapitalize="characters" placeholder="1234 УБА">
+    <div class="hint" id="plateHint"></div>
+
+    <label>Угаалгын төрөл</label>
+    <div class="chips" id="svcChips"></div>
+
+    <label for="price">Үнэ (₮)</label>
+    <input id="price" type="number" inputmode="numeric" min="0" step="500" placeholder="0">
+
+    <label>Угаасан ажилтан</label>
+    <div class="chips" id="wrkChips"></div>
+
+    <label>Төлбөрийн хэлбэр</label>
+    <div class="chips" id="payChips"></div>
+
+    <div class="row">
+      <div><label for="date">Огноо</label><input id="date" type="date"></div>
+      <div><label for="time">Цаг</label><input id="time" type="time"></div>
+    </div>
+
+    <label for="note">Тэмдэглэл (заавал биш)</label>
+    <input id="note" autocomplete="off" placeholder="">
+
+    <button class="btn" id="saveBtn">Хадгалах</button>
+    <button class="btn ghost" id="cancelEdit" style="display:none">Засварыг болих</button>
+    <button class="btn red" id="delBtn" style="display:none">Энэ бүртгэлийг устгах</button>
+  </div>
+</section>
+
+<!-- ЖАГСААЛТ -->
+<section class="page" id="p-list">
+  <div class="card">
+    <div class="row">
+      <div><label for="fDate">Огноо</label><input id="fDate" type="date"></div>
+      <div><label for="fPlate">Дугаараар хайх</label><input id="fPlate" autocomplete="off" placeholder="1234"></div>
+    </div>
+    <div class="hint" id="listSum"></div>
+  </div>
+  <div class="card" id="listBox"></div>
+</section>
+
+<!-- ТАЙЛАН -->
+<section class="page" id="p-rep">
+  <div class="card">
+    <label for="period">Хугацаа</label>
+    <select id="period">
+      <option value="today">Өнөөдөр</option>
+      <option value="yest">Өчигдөр</option>
+      <option value="7">Сүүлийн 7 хоног</option>
+      <option value="month">Энэ сар</option>
+      <option value="pmonth">Өмнөх сар</option>
+      <option value="all">Бүх хугацаа</option>
+    </select>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="card"><h2>Төлбөрийн хэлбэрээр</h2><div id="byPay"></div></div>
+  <div class="card"><h2>Угаалгын төрлөөр</h2><div id="bySvc"></div></div>
+  <div class="card"><h2>Ажилтнаар</h2><div id="byWrk"></div></div>
+  <div class="card"><h2>Утсаар</h2><div id="byDev"></div></div>
+  <div class="card"><h2>Өдрөөр</h2><div id="byDay"></div></div>
+</section>
+
+<!-- ТОХИРГОО -->
+<section class="page" id="p-set">
+  <div class="card">
+    <h2>Утас хооронд өгөгдөл дамжуулах</h2>
+    <label for="devName">Энэ утасны нэр</label>
+    <input id="devName" autocomplete="off" placeholder="Жишээ: 1-р утас">
+    <div class="hint" id="sendInfo"></div>
+    <button class="btn" id="sendBtn">Шинэ бүртгэлээ илгээх</button>
+    <button class="btn ghost" id="sendAll">Бүх бүртгэлээ дахин илгээх</button>
+    <button class="btn ghost" id="recvBtn">Ирсэн файлыг оруулах</button>
+    <button class="btn ghost" id="sendSet">Үнэ, ажилтны жагсаалтыг илгээх</button>
+  </div>
+  <div class="card">
+    <h2>Угаалгын төрөл ба үнэ</h2>
+    <div id="svcSet"></div>
+    <button class="btn ghost" id="addSvc">+ Төрөл нэмэх</button>
+  </div>
+  <div class="card">
+    <h2>Ажилтнууд</h2>
+    <div id="wrkSet"></div>
+    <button class="btn ghost" id="addWrk">+ Ажилтан нэмэх</button>
+  </div>
+  <div class="card">
+    <h2>Өгөгдөл хадгалах, сэргээх</h2>
+    <div class="hint" style="margin:0 0 4px">Бүртгэл зөвхөн энэ утасны хөтөч дотор хадгалагдана. Долоо хоногт нэг удаа нөөц файл татаж авахыг зөвлөж байна.</div>
+    <button class="btn ghost" id="expCsv">Excel-д зориулж татах (CSV)</button>
+    <button class="btn ghost" id="expJson">Нөөц файл татах</button>
+    <button class="btn ghost" id="impBtn">Нөөц файлаас сэргээх</button>
+    <input type="file" id="impFile" accept=".json,.txt,application/json,text/plain" multiple style="display:none">
+    <div class="hint" id="backupInfo"></div>
+    <button class="btn red" id="wipe">Бүх бүртгэлийг устгах</button>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button data-p="add" class="on"><b>＋</b>Бүртгэх</button>
+  <button data-p="list"><b>☰</b>Жагсаалт</button>
+  <button data-p="rep"><b>▥</b>Тайлан</button>
+  <button data-p="set"><b>⚙</b>Тохиргоо</button>
+</nav>
+<div id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+var KEY='ugaalga_v1';
+var PAYS=['Бэлэн','Карт','Шилжүүлэг'];
+var mem=null, storageOK=true;
+
+function defaults(){
+  return {
+    records:[],
+    services:[
+      {id:'s1',name:'Гадна угаалга',price:15000},
+      {id:'s2',name:'Гадна + дотор',price:25000},
+      {id:'s3',name:'Бүтэн угаалга',price:35000},
+      {id:'s4',name:'Мотор угаалга',price:20000}
+    ],
+    workers:['Ажилтан 1','Ажилтан 2'],
+    lastBackup:null,
+    device:''
+  };
+}
+function load(){
+  try{
+    var t='__t'; localStorage.setItem(t,'1'); localStorage.removeItem(t);
+    var raw=localStorage.getItem(KEY);
+    if(raw){ var d=JSON.parse(raw); if(d&&Array.isArray(d.records)) return normalize(d); }
+  }catch(e){ storageOK=false; }
+  return defaults();
+}
+function normalize(d){
+  var b=defaults();
+  if(!Array.isArray(d.services)) d.services=b.services;
+  if(!Array.isArray(d.workers)) d.workers=b.workers;
+  if(!('lastBackup' in d)) d.lastBackup=null;
+  if(typeof d.device!=='string') d.device='';
+  return d;
+}
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(db)); }
+  catch(e){ storageOK=false; document.getElementById('warn').style.display='block'; }
+}
+var db=load();
+function live(){return db.records.filter(function(r){return !r.del;});}
+if(!storageOK) document.getElementById('warn').style.display='block';
+
+/* ---------- helpers ---------- */
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function p2(n){return (n<10?'0':'')+n;}
+function dstr(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function tstr(d){return p2(d.getHours())+':'+p2(d.getMinutes());}
+function money(n){return Math.round(n||0).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')+'₮';}
+function normPlate(s){return String(s||'').toUpperCase().replace(/\s+/g,' ').trim();}
+function plateKey(s){return normPlate(s).replace(/[\s\-]/g,'');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+var toastT;
+function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');
+  clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on');},2200);}
+function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x;}
+
+/* ---------- add / edit form ---------- */
+var sel={svc:null,wrk:null,pay:PAYS[0]}, editId=null;
+
+function drawChips(){
+  $('svcChips').innerHTML=db.services.map(function(s){
+    return '<button type="button" class="chip'+(sel.svc===s.name?' on':'')+'" data-svc="'+esc(s.id)+'">'+
+      esc(s.name)+'<small>'+money(s.price)+'</small></button>';}).join('')||'<div class="hint">Тохиргооноос төрөл нэмнэ үү.</div>';
+  $('wrkChips').innerHTML=db.workers.map(function(w,i){
+    return '<button type="button" class="chip'+(sel.wrk===w?' on':'')+'" data-wrk="'+i+'">'+esc(w)+'</button>';}).join('')||'<div class="hint">Тохиргооноос ажилтан нэмнэ үү.</div>';
+  $('payChips').innerHTML=PAYS.map(function(p,i){
+    return '<button type="button" class="chip'+(sel.pay===p?' on':'')+'" data-pay="'+i+'">'+esc(p)+'</button>';}).join('');
+}
+function resetForm(){
+  editId=null; var now=new Date();
+  $('plate').value=''; $('price').value=''; $('note').value='';
+  $('date').value=dstr(now); $('time').value=tstr(now);
+  sel.svc=null; sel.pay=PAYS[0]; /* ажилтныг хэвээр үлдээнэ */
+  $('plateHint').innerHTML='';
+  $('saveBtn').textContent='Хадгалах';
+  $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
+  drawChips();
+}
+$('svcChips').addEventListener('click',function(e){
+  var b=e.target.closest('[data-svc]'); if(!b) return;
+  var s=db.services.filter(function(x){return x.id===b.getAttribute('data-svc');})[0]; if(!s) return;
+  sel.svc=s.name; $('price').value=s.price; drawChips();
+});
+$('wrkChips').addEventListener('click',function(e){
+  var b=e.target.closest('[data-wrk]'); if(!b) return;
+  sel.wrk=db.workers[+b.getAttribute('data-wrk')]; drawChips();
+});
+$('payChips').addEventListener('click',function(e){
+  var b=e.target.closest('[data-pay]'); if(!b) return;
+  sel.pay=PAYS[+b.getAttribute('data-pay')]; drawChips();
+});
+$('plate').addEventListener('input',function(){
+  var k=plateKey(this.value), h=$('plateHint');
+  if(k.length<4){h.innerHTML='';return;}
+  var prev=live().filter(function(r){return plateKey(r.plate)===k && r.id!==editId;});
+  if(!prev.length){h.innerHTML='Шинэ үйлчлүүлэгч';return;}
+  prev.sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time);});
+  h.innerHTML='<b>Байнгын үйлчлүүлэгч</b> · өмнө нь '+prev.length+' удаа · сүүлд '+esc(prev[0].date)+' ('+esc(prev[0].service)+')';
+});
+$('saveBtn').addEventListener('click',function(){
+  var plate=normPlate($('plate').value), price=parseFloat($('price').value);
+  if(!plate){toast('Улсын дугаараа оруулна уу');$('plate').focus();return;}
+  if(!sel.svc){toast('Угаалгын төрлөө сонгоно уу');return;}
+  if(isNaN(price)||price<0){toast('Үнээ оруулна уу');$('price').focus();return;}
+  var now=new Date();
+  var old=editId?db.records.filter(function(x){return x.id===editId;})[0]:null;
+  var rec={id:editId||uid(),plate:plate,service:sel.svc,price:price,worker:sel.wrk||'',
+    pay:sel.pay,date:$('date').value||dstr(now),time:$('time').value||tstr(now),note:$('note').value.trim(),
+    dev:old?(old.dev||''):db.device,upd:Date.now(),sent:false};
+  if(editId){
+    for(var i=0;i<db.records.length;i++) if(db.records[i].id===editId){db.records[i]=rec;break;}
+    toast('Засвар хадгалагдлаа');
+  }else{
+    db.records.push(rec); toast('Хадгаллаа: '+plate+' · '+money(price));
+  }
+  save(); resetForm(); refreshAll();
+  if(document.querySelector('nav button.on').getAttribute('data-p')!=='add') show('list');
+});
+$('cancelEdit').addEventListener('click',function(){resetForm();show('list');});
+$('delBtn').addEventListener('click',function(){
+  if(!editId||!confirm('Энэ бүртгэлийг устгах уу?')) return;
+  db.records.forEach(function(r){if(r.id===editId){r.del=true;r.upd=Date.now();r.sent=false;}});
+  save(); resetForm(); refreshAll(); show('list'); toast('Устгалаа');
+});
+function startEdit(id){
+  var r=db.records.filter(function(x){return x.id===id;})[0]; if(!r) return;
+  editId=id; $('plate').value=r.plate; $('price').value=r.price; $('note').value=r.note||'';
+  $('date').value=r.date; $('time').value=r.time;
+  sel.svc=r.service; sel.wrk=r.worker||null; sel.pay=r.pay||PAYS[0];
+  $('saveBtn').textContent='Засварыг хадгалах';
+  $('cancelEdit').style.display='block'; $('delBtn').style.display='block';
+  $('plateHint').innerHTML=''; drawChips(); show('add'); window.scrollTo(0,0);
+}
+
+/* ---------- list ---------- */
+function drawList(){
+  var d=$('fDate').value, q=plateKey($('fPlate').value);
+  var rows=live().filter(function(r){
+    if(q) return plateKey(r.plate).indexOf(q)>=0;
+    return !d||r.date===d;
+  }).sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time);});
+  var tot=rows.reduce(function(s,r){return s+(+r.price||0);},0);
+  $('listSum').textContent=rows.length+' машин · нийт '+money(tot)+(q?' (бүх өдрөөс хайсан)':'');
+  var shown=rows.slice(0,300);
+  $('listBox').innerHTML=shown.length?shown.map(function(r){
+    return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+'</div>'+
+      '<div class="s">'+esc(r.service)+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
+      '<div class="amt">'+money(r.price)+'<small>'+(q?esc(r.date)+' ':'')+esc(r.time)+' · '+esc(r.pay)+'</small></div></div>';
+  }).join('')+(rows.length>shown.length?'<div class="empty">Эхний 300-г харууллаа</div>':'')
+  :'<div class="empty">Бүртгэл алга</div>';
+}
+$('fDate').addEventListener('change',drawList);
+$('fPlate').addEventListener('input',drawList);
+$('listBox').addEventListener('click',function(e){
+  var r=e.target.closest('.rec'); if(r) startEdit(r.getAttribute('data-id'));
+});
+
+/* ---------- report ---------- */
+function range(p){
+  var now=new Date(), t=dstr(now);
+  if(p==='today') return [t,t];
+  if(p==='yest'){var y=dstr(addDays(now,-1));return [y,y];}
+  if(p==='7') return [dstr(addDays(now,-6)),t];
+  if(p==='month') return [dstr(new Date(now.getFullYear(),now.getMonth(),1)),t];
+  if(p==='pmonth') return [dstr(new Date(now.getFullYear(),now.getMonth()-1,1)),dstr(new Date(now.getFullYear(),now.getMonth(),0))];
+  return ['0000-00-00','9999-99-99'];
+}
+function group(rows,key){
+  var m={},out=[];
+  rows.forEach(function(r){var k=r[key]||'—'; if(!m[k]){m[k]={k:k,n:0,sum:0};out.push(m[k]);} m[k].n++; m[k].sum+=(+r.price||0);});
+  return out;
+}
+function bars(list,total){
+  if(!list.length) return '<div class="empty">Өгөгдөл алга</div>';
+  var max=Math.max.apply(null,list.map(function(x){return x.sum;}))||1;
+  return list.map(function(x){
+    var pct=total?Math.round(x.sum/total*100):0;
+    return '<div class="bar"><div class="t"><span>'+esc(x.k)+' <span style="color:var(--muted)">· '+x.n+'</span></span>'+
+      '<span>'+money(x.sum)+' · '+pct+'%</span></div><div class="g"><i style="width:'+Math.max(2,Math.round(x.sum/max*100))+'%"></i></div></div>';
+  }).join('');
+}
+function drawReport(){
+  var rg=range($('period').value);
+  var rows=live().filter(function(r){return r.date>=rg[0]&&r.date<=rg[1];});
+  var tot=rows.reduce(function(s,r){return s+(+r.price||0);},0);
+  var days=group(rows,'date');
+  var uniq={}; rows.forEach(function(r){uniq[plateKey(r.plate)]=1;});
+  $('stats').innerHTML=
+    '<div class="stat wide"><div class="k">Нийт орлого</div><div class="v">'+money(tot)+'</div></div>'+
+    '<div class="stat"><div class="k">Угаасан машин</div><div class="v">'+rows.length+'</div></div>'+
+    '<div class="stat"><div class="k">Дундаж үнэ</div><div class="v">'+money(rows.length?tot/rows.length:0)+'</div></div>'+
+    '<div class="stat"><div class="k">Давхардаагүй машин</div><div class="v">'+Object.keys(uniq).length+'</div></div>'+
+    '<div class="stat"><div class="k">Өдрийн дундаж орлого</div><div class="v">'+money(days.length?tot/days.length:0)+'</div></div>';
+  var by=function(k){return group(rows,k).sort(function(a,b){return b.sum-a.sum;});};
+  $('byPay').innerHTML=bars(by('pay'),tot);
+  $('bySvc').innerHTML=bars(by('service'),tot);
+  $('byWrk').innerHTML=bars(by('worker'),tot);
+  $('byDev').innerHTML=bars(by('dev'),tot);
+  $('byDay').innerHTML=bars(days.sort(function(a,b){return b.k.localeCompare(a.k);}).slice(0,62),tot);
+}
+$('period').addEventListener('change',drawReport);
+
+/* ---------- settings ---------- */
+function drawSettings(){
+  $('svcSet').innerHTML=db.services.map(function(s,i){
+    return '<div class="setrow"><input data-sn="'+i+'" value="'+esc(s.name)+'" placeholder="Нэр">'+
+      '<input class="pr" data-sp="'+i+'" type="number" inputmode="numeric" value="'+esc(s.price)+'" placeholder="Үнэ">'+
+      '<button class="x" data-sx="'+i+'" aria-label="Устгах">×</button></div>';}).join('');
+  $('wrkSet').innerHTML=db.workers.map(function(w,i){
+    return '<div class="setrow"><input data-wn="'+i+'" value="'+esc(w)+'" placeholder="Нэр">'+
+      '<button class="x" data-wx="'+i+'" aria-label="Устгах">×</button></div>';}).join('');
+  $('devName').value=db.device;
+  var un=db.records.filter(function(r){return !r.sent;}).length;
+  $('sendInfo').textContent='Илгээгээгүй бүртгэл: '+un;
+  $('backupInfo').textContent='Нийт '+live().length+' бүртгэл · сүүлийн нөөц: '+(db.lastBackup||'аваагүй');
+}
+$('svcSet').addEventListener('change',function(e){
+  var t=e.target;
+  if(t.hasAttribute('data-sn')) db.services[+t.getAttribute('data-sn')].name=t.value.trim()||'Нэргүй';
+  if(t.hasAttribute('data-sp')) db.services[+t.getAttribute('data-sp')].price=parseFloat(t.value)||0;
+  save(); drawChips();
+});
+$('svcSet').addEventListener('click',function(e){
+  var b=e.target.closest('[data-sx]'); if(!b) return;
+  if(!confirm('Энэ төрлийг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.')) return;
+  db.services.splice(+b.getAttribute('data-sx'),1); save(); drawSettings(); drawChips();
+});
+$('addSvc').addEventListener('click',function(){
+  db.services.push({id:uid(),name:'Шинэ төрөл',price:0}); save(); drawSettings(); drawChips();
+});
+$('wrkSet').addEventListener('change',function(e){
+  var t=e.target; if(!t.hasAttribute('data-wn')) return;
+  db.workers[+t.getAttribute('data-wn')]=t.value.trim()||'Нэргүй'; sel.wrk=null; save(); drawChips();
+});
+$('wrkSet').addEventListener('click',function(e){
+  var b=e.target.closest('[data-wx]'); if(!b) return;
+  if(!confirm('Энэ ажилтныг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.')) return;
+  db.workers.splice(+b.getAttribute('data-wx'),1); sel.wrk=null; save(); drawSettings(); drawChips();
+});
+$('addWrk').addEventListener('click',function(){
+  db.workers.push('Ажилтан '+(db.workers.length+1)); save(); drawSettings(); drawChips();
+});
+
+function download(name,text,type){
+  var blob=new Blob([text],{type:type}), file=null;
+  function saveAs(){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+  }
+  try{ file=new File([blob],name,{type:type}); }catch(e){}
+  var can=false;
+  try{ can=!!(file&&navigator.canShare&&navigator.canShare({files:[file]})&&/Android|iPhone|iPad/i.test(navigator.userAgent)); }catch(e){}
+  if(can){
+    return navigator.share({files:[file],title:name}).then(function(){return true;},function(e){
+      if(e&&e.name==='AbortError') return false;
+      saveAs(); return true;
+    });
+  }
+  saveAs(); return Promise.resolve(true);
+}
+function csvCell(v){v=String(v==null?'':v); return /[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+$('expCsv').addEventListener('click',function(){
+  if(!live().length){toast('Бүртгэл алга');return;}
+  var rows=live().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+  var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Үнэ','Ажилтан','Төлбөр','Тэмдэглэл','Утас'].join(',')];
+  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,r.price,r.worker,r.pay,r.note,r.dev||''].map(csvCell).join(','));});
+  download('ugaalga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
+});
+$('expJson').addEventListener('click',function(){
+  db.lastBackup=dstr(new Date()); save(); drawSettings();
+  var o=JSON.parse(JSON.stringify(db)); o.app=KEY; o.kind='backup';
+  download('ugaalga-nuuts-'+dstr(new Date())+'.json',JSON.stringify(o),'application/json');
+});
+$('impBtn').addEventListener('click',function(){$('impFile').click();});
+$('recvBtn').addEventListener('click',function(){$('impFile').click();});
+
+function mergeFile(d,res,had){
+  if(!d||typeof d!=='object') throw 0;
+  var isSet=d.kind==='settings';
+  if(!isSet&&!Array.isArray(d.records)) throw 0;
+  if(Array.isArray(d.records)){
+    var idx={}; db.records.forEach(function(r,i){idx[r.id]=i;});
+    d.records.forEach(function(r){
+      if(!r||typeof r!=='object'||!r.id) return;
+      var c={},k; for(k in r) c[k]=r[k];
+      if(d.kind==='send') c.sent=true;
+      if(!c.dev&&d.device) c.dev=d.device;
+      if(!(c.id in idx)){
+        idx[c.id]=db.records.length; db.records.push(c); if(!c.del) res.add++;
+      }else{
+        var l=db.records[idx[c.id]];
+        if((c.upd||0)>(l.upd||0)){
+          db.records[idx[c.id]]=c;
+          if(c.del&&!l.del) res.del++; else res.upd++;
+        }
+      }
+    });
+  }
+  var takeSet=isSet?confirm('Үнэ, ажилтны жагсаалтыг ирсэн файлынхаар солих уу?'):(d.kind!=='send'&&!had);
+  if(takeSet){
+    if(Array.isArray(d.services)){
+      db.services=d.services.filter(function(x){return x&&x.name;}).map(function(x){
+        return {id:String(x.id||uid()),name:String(x.name),price:parseFloat(x.price)||0};});
+      res.set=true;
+    }
+    if(Array.isArray(d.workers)){
+      db.workers=d.workers.filter(function(x){return typeof x==='string'&&x;}); res.set=true;
+    }
+    if(!isSet&&!db.device&&typeof d.device==='string') db.device=d.device;
+  }
+}
+$('impFile').addEventListener('change',function(){
+  var files=Array.prototype.slice.call(this.files), inp=this; if(!files.length) return;
+  var res={add:0,upd:0,del:0,bad:0,set:false}, had=live().length>0, i=0;
+  (function next(){
+    if(i>=files.length){
+      sel.wrk=null; save(); refreshAll(); drawChips(); inp.value='';
+      var m=[res.add+' шинэ бүртгэл нэмэгдлээ'];
+      if(res.upd) m.push(res.upd+' бүртгэл шинэчлэгдлээ');
+      if(res.del) m.push(res.del+' бүртгэл устгагдлаа');
+      if(res.set) m.push('Үнэ, ажилтны жагсаалт солигдлоо');
+      if(res.bad) m.push(res.bad+' файлыг уншиж чадсангүй');
+      alert(m.join('\n'));
+      return;
+    }
+    var rd=new FileReader();
+    rd.onload=function(){
+      try{ mergeFile(JSON.parse(String(rd.result).replace(/^﻿/,'')),res,had); }catch(e){ res.bad++; }
+      i++; next();
+    };
+    rd.onerror=function(){ res.bad++; i++; next(); };
+    rd.readAsText(files[i]);
+  })();
+});
+
+function devSlug(){return (db.device||'utas').replace(/[\\\/:*?"<>|\s]+/g,'-');}
+function sendRecords(all){
+  if(!db.device){toast('Эхлээд энэ утасны нэрийг бичнэ үү');$('devName').focus();return;}
+  var rows=db.records.filter(function(r){return all||!r.sent;});
+  if(!rows.length){toast(all?'Бүртгэл алга':'Илгээх шинэ бүртгэл алга');return;}
+  var ids={}; rows.forEach(function(r){ids[r.id]=r.upd||0;});
+  var now=new Date();
+  var payload={app:KEY,kind:'send',device:db.device,at:now.toISOString(),records:rows};
+  download('ugaalga-'+devSlug()+'-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',JSON.stringify(payload),'text/plain')
+  .then(function(ok){
+    if(!ok){toast('Илгээлт цуцлагдлаа');return;}
+    db.records.forEach(function(r){if((r.id in ids)&&(r.upd||0)===ids[r.id]) r.sent=true;});
+    save(); drawSettings(); toast(rows.length+' бүртгэлийг файл болгож гаргалаа');
+  });
+}
+$('sendBtn').addEventListener('click',function(){sendRecords(false);});
+$('sendAll').addEventListener('click',function(){sendRecords(true);});
+$('sendSet').addEventListener('click',function(){
+  download('ugaalga-tohirgoo-'+dstr(new Date())+'.txt',
+    JSON.stringify({app:KEY,kind:'settings',services:db.services,workers:db.workers}),'text/plain');
+});
+$('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
+$('wipe').addEventListener('click',function(){
+  if(!confirm('Бүх бүртгэлийг устгах уу? Буцаах боломжгүй.')) return;
+  if(!confirm('Итгэлтэй байна уу? '+live().length+' бүртгэл устна.')) return;
+  db.records=[]; save(); refreshAll(); toast('Устгалаа');
+});
+
+/* ---------- nav ---------- */
+function show(p){
+  ['add','list','rep','set'].forEach(function(x){
+    $('p-'+x).classList.toggle('on',x===p);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('nav button'),function(b){
+    b.classList.toggle('on',b.getAttribute('data-p')===p);
+  });
+  if(p==='list') drawList();
+  if(p==='rep') drawReport();
+  if(p==='set') drawSettings();
+}
+document.querySelector('nav').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  if(editId&&b.getAttribute('data-p')!=='add') resetForm();
+  show(b.getAttribute('data-p'));
+});
+function refreshAll(){ drawList(); drawReport(); drawSettings(); }
+
+/* ---------- init ---------- */
+var now=new Date();
+$('hdrDate').textContent=dstr(now);
+$('fDate').value=dstr(now);
+resetForm(); refreshAll();
+})();
+</script>
+<script>
+(function(){
+  if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return;
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+  navigator.serviceWorker.ready.then(function(){
+    var d=document.createElement('div'); d.className='card';
+    d.innerHTML='<div class="hint" style="margin:0"><b>✓ Офлайнд ажиллахад бэлэн.</b> Одоо интернэтгүй үед ч нээгдэнэ.</div>';
+    document.getElementById('p-set').appendChild(d);
+  }).catch(function(){});
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+})();
+</script>
+</body>
+</html>
