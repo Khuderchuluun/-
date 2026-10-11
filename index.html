@@ -83,9 +83,15 @@ nav button b{display:block;font-size:20px;font-weight:400;line-height:1.2}
 nav button.on{color:var(--brand);font-weight:700}
 #toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);
   background:var(--text);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;
-  opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:90%;text-align:center}
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%;text-align:center}
 #toast.on{opacity:1}
 #warn{display:none;background:var(--danger);color:#fff;padding:10px 16px;font-size:14px}
+body.worker .adm{display:none!important}
+body:not(.worker) .wrk{display:none!important}
+body.worker .rec{cursor:default}
+#setup{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:20;display:none;overflow:auto;padding:24px 16px}
+#setup.on{display:block}
+#setup .box{max-width:420px;margin:0 auto}
 </style>
 </head>
 <body>
@@ -169,19 +175,22 @@ nav button.on{color:var(--brand);font-weight:700}
     <button class="btn" id="sendBtn">Шинэ бүртгэлээ илгээх</button>
     <button class="btn ghost" id="sendAll">Бүх бүртгэлээ дахин илгээх</button>
     <button class="btn ghost" id="recvBtn">Ирсэн файлыг оруулах</button>
-    <button class="btn ghost" id="sendSet">Үнэ, ажилтны жагсаалтыг илгээх</button>
+    <button class="btn ghost adm" id="sendSet">Үнэ, ажилтны жагсаалтыг илгээх</button>
+    <div class="hint wrk">Ажилтны утас зөвхөн гол утаснаас ирсэн үнэ, ажилтны жагсаалтыг хүлээн авна.</div>
+    <button class="btn ghost adm" id="toWorker">Энэ утсыг ажилтны утас болгох</button>
+    <button class="btn ghost wrk" id="toMain">Гол утасны горим руу шилжих (PIN)</button>
   </div>
-  <div class="card">
+  <div class="card adm">
     <h2>Угаалгын төрөл ба үнэ</h2>
     <div id="svcSet"></div>
     <button class="btn ghost" id="addSvc">+ Төрөл нэмэх</button>
   </div>
-  <div class="card">
+  <div class="card adm">
     <h2>Ажилтнууд</h2>
     <div id="wrkSet"></div>
     <button class="btn ghost" id="addWrk">+ Ажилтан нэмэх</button>
   </div>
-  <div class="card">
+  <div class="card adm">
     <h2>Өгөгдөл хадгалах, сэргээх</h2>
     <div class="hint" style="margin:0 0 4px">Бүртгэл зөвхөн энэ утасны хөтөч дотор хадгалагдана. Долоо хоногт нэг удаа нөөц файл татаж авахыг зөвлөж байна.</div>
     <button class="btn ghost" id="expCsv">Excel-д зориулж татах (CSV)</button>
@@ -194,10 +203,28 @@ nav button.on{color:var(--brand);font-weight:700}
 </section>
 </main>
 
+<div id="setup"><div class="box">
+  <div class="card" id="suRole">
+    <h2>Энэ утсыг тохируулах</h2>
+    <div class="hint" style="margin:0 0 4px">Гол утас бүртгэлийг засах, устгах, тайлан харах, үнэ тохируулах эрхтэй. Ажилтны утас зөвхөн бүртгэл үүсгэж, гол утас руу илгээнэ.</div>
+    <label for="suName">Энэ утасны нэр</label>
+    <input id="suName" autocomplete="off" placeholder="Жишээ: 1-р утас">
+    <button class="btn" id="suMain">Гол утас</button>
+    <button class="btn ghost" id="suWorker">Ажилтны утас</button>
+  </div>
+  <div class="card" id="suPin" style="display:none">
+    <h2 id="suPinTitle"></h2>
+    <div class="hint" id="suPinHint" style="margin:0 0 4px"></div>
+    <label for="suPinIn">PIN код</label>
+    <input id="suPinIn" type="password" inputmode="numeric" autocomplete="off">
+    <button class="btn" id="suPinOk">Батлах</button>
+    <button class="btn ghost" id="suPinBack">Буцах</button>
+  </div>
+</div></div>
 <nav>
   <button data-p="add" class="on"><b>＋</b>Бүртгэх</button>
   <button data-p="list"><b>☰</b>Жагсаалт</button>
-  <button data-p="rep"><b>▥</b>Тайлан</button>
+  <button data-p="rep" class="adm"><b>▥</b>Тайлан</button>
   <button data-p="set"><b>⚙</b>Тохиргоо</button>
 </nav>
 <div id="toast"></div>
@@ -220,7 +247,9 @@ function defaults(){
     ],
     workers:['Ажилтан 1','Ажилтан 2'],
     lastBackup:null,
-    device:''
+    device:'',
+    role:null,
+    pin:null
   };
 }
 function load(){
@@ -237,6 +266,8 @@ function normalize(d){
   if(!Array.isArray(d.workers)) d.workers=b.workers;
   if(!('lastBackup' in d)) d.lastBackup=null;
   if(typeof d.device!=='string') d.device='';
+  if(d.role!=='main'&&d.role!=='worker') d.role=null;
+  if(typeof d.pin!=='string') d.pin=null;
   return d;
 }
 function save(){
@@ -332,6 +363,7 @@ $('delBtn').addEventListener('click',function(){
   save(); resetForm(); refreshAll(); show('list'); toast('Устгалаа');
 });
 function startEdit(id){
+  if(db.role!=='main') return;
   var r=db.records.filter(function(x){return x.id===id;})[0]; if(!r) return;
   editId=id; $('plate').value=r.plate; $('price').value=r.price; $('note').value=r.note||'';
   $('date').value=r.date; $('time').value=r.time;
@@ -478,7 +510,7 @@ $('expCsv').addEventListener('click',function(){
 });
 $('expJson').addEventListener('click',function(){
   db.lastBackup=dstr(new Date()); save(); drawSettings();
-  var o=JSON.parse(JSON.stringify(db)); o.app=KEY; o.kind='backup';
+  var o=JSON.parse(JSON.stringify(db)); o.app=KEY; o.kind='backup'; delete o.pin; delete o.role;
   download('ugaalga-nuuts-'+dstr(new Date())+'.json',JSON.stringify(o),'application/json');
 });
 $('impBtn').addEventListener('click',function(){$('impFile').click();});
@@ -487,6 +519,7 @@ $('recvBtn').addEventListener('click',function(){$('impFile').click();});
 function mergeFile(d,res,had){
   if(!d||typeof d!=='object') throw 0;
   var isSet=d.kind==='settings';
+  if(db.role==='worker'&&!isSet) throw 0;
   if(!isSet&&!Array.isArray(d.records)) throw 0;
   if(Array.isArray(d.records)){
     var idx={}; db.records.forEach(function(r,i){idx[r.id]=i;});
@@ -573,6 +606,7 @@ $('wipe').addEventListener('click',function(){
 
 /* ---------- nav ---------- */
 function show(p){
+  if(db.role==='worker'&&p==='rep') p='add';
   ['add','list','rep','set'].forEach(function(x){
     $('p-'+x).classList.toggle('on',x===p);
   });
@@ -591,10 +625,57 @@ document.querySelector('nav').addEventListener('click',function(e){
 function refreshAll(){ drawList(); drawReport(); drawSettings(); }
 
 /* ---------- init ---------- */
+/* ---------- roles ---------- */
+var pinMode=null;
+function hash(str){var x=5381,i,t=KEY+':'+str;for(i=0;i<t.length;i++) x=((x<<5)+x+t.charCodeAt(i))|0;return 'h'+(x>>>0).toString(36);}
+function showSetup(step,mode){
+  $('setup').classList.add('on');
+  $('suRole').style.display=step==='role'?'block':'none';
+  $('suPin').style.display=step==='pin'?'block':'none';
+  if(step==='role') $('suName').value=db.device||'';
+  if(step==='pin'){
+    pinMode=mode; $('suPinIn').value='';
+    $('suPinTitle').textContent=mode==='set'?'Түгжих PIN код тогтоох':'PIN кодоо оруулна уу';
+    $('suPinHint').textContent=mode==='set'
+      ?'Энэ утсыг дараа нь гол утас болгоход энэ код шаардагдана. Зөвхөн эзэн мэдэх, 4-өөс дээш оронтой тоо оруулна уу.'
+      :'Ажилтны утсыг тохируулахдаа тогтоосон кодыг оруулна уу.';
+  }
+}
+function applyRole(){
+  var w=db.role==='worker';
+  document.body.classList.toggle('worker',w);
+  $('devName').disabled=w;
+  $('hdrDate').textContent=dstr(new Date())+(db.role?' · '+(w?'Ажилтан':'Гол утас'):'');
+  if(db.role) $('setup').classList.remove('on'); else showSetup('role');
+}
+function suNameOk(){
+  var n=$('suName').value.trim();
+  if(!n){toast('Утасны нэрийг бичнэ үү');$('suName').focus();return false;}
+  db.device=n; return true;
+}
+function roleDone(msg){ save(); if(editId) resetForm(); applyRole(); refreshAll(); show('add'); toast(msg); }
+$('suMain').addEventListener('click',function(){ if(!suNameOk()) return; db.role='main'; roleDone('Гол утас боллоо'); });
+$('suWorker').addEventListener('click',function(){ if(!suNameOk()) return; showSetup('pin','set'); });
+$('suPinOk').addEventListener('click',function(){
+  var p=$('suPinIn').value.trim();
+  if(pinMode==='set'){
+    if(!/^\d{4,}$/.test(p)){toast('4-өөс дээш оронтой тоо оруулна уу');return;}
+    db.pin=hash(p); db.role='worker'; roleDone('Ажилтны утас боллоо');
+  }else{
+    if(!db.pin||hash(p)!==db.pin){toast('PIN код буруу байна');$('suPinIn').value='';return;}
+    db.role='main'; roleDone('Гол утасны горимд шилжлээ');
+  }
+});
+$('suPinBack').addEventListener('click',function(){ if(db.role) $('setup').classList.remove('on'); else showSetup('role'); });
+$('toWorker').addEventListener('click',function(){
+  if(!db.device){toast('Эхлээд энэ утасны нэрийг бичнэ үү');$('devName').focus();return;}
+  showSetup('pin','set');
+});
+$('toMain').addEventListener('click',function(){ showSetup('pin','unlock'); });
+
 var now=new Date();
-$('hdrDate').textContent=dstr(now);
 $('fDate').value=dstr(now);
-resetForm(); refreshAll();
+resetForm(); refreshAll(); applyRole();
 })();
 </script>
 <script>
