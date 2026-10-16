@@ -963,12 +963,35 @@ resetForm(); refreshAll(); applyRole();
 </script>
 <script>
 (function(){
+  var APP_VER='2026-10-17b';
+  var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
+  vd.textContent='Аппын хувилбар: '+APP_VER;
+  document.getElementById('p-set').appendChild(vd);
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return;
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+  var hadCtrl=!!navigator.serviceWorker.controller, shown=false;
+  /* Шинэ хувилбар суусан үед дээд талд мэдэгдэл гаргана */
+  function offerReload(){
+    if(shown||!hadCtrl) return; shown=true;
+    var b=document.createElement('div');
+    b.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:25;'+
+      'background:var(--ok);color:#fff;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:15px';
+    b.innerHTML='<span>Шинэ хувилбар бэлэн боллоо</span>';
+    var btn=document.createElement('button'); btn.type='button'; btn.textContent='Шинэчлэх';
+    btn.style.cssText='border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;background:#fff;color:var(--ok);min-height:44px';
+    btn.onclick=function(){ location.reload(); };
+    b.appendChild(btn); document.body.appendChild(b);
+  }
+  navigator.serviceWorker.addEventListener('controllerchange',offerReload);
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
+    /* Апп руу буцаж орох бүрт шинэ хувилбар байгаа эсэхийг шалгана */
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState==='visible'){ try{ reg.update(); }catch(e){} }
+    });
+  }).catch(function(){});
   navigator.serviceWorker.ready.then(function(){
     var d=document.createElement('div'); d.className='card';
     d.innerHTML='<div class="hint" style="margin:0"><b>✓ Офлайнд ажиллахад бэлэн.</b> Одоо интернэтгүй үед ч нээгдэнэ.</div>';
-    document.getElementById('p-set').appendChild(d);
+    document.getElementById('p-set').insertBefore(d,vd);
   }).catch(function(){});
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 })();
