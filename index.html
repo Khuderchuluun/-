@@ -17,16 +17,31 @@
   --brand:#0f6fb8; --brand-ink:#ffffff; --soft:#e6f1fa; --danger:#c8372d; --ok:#1d8a4e;
 }
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]){
     --bg:#0e151b; --card:#17212a; --text:#e8eef3; --muted:#93a2af; --line:#283642;
     --brand:#3d9be0; --brand-ink:#06131d; --soft:#1c3345; --danger:#ef6a60; --ok:#4cc483;
+    color-scheme:dark;
   }
 }
+:root[data-theme="dark"]{
+  --bg:#0e151b; --card:#17212a; --text:#e8eef3; --muted:#93a2af; --line:#283642;
+  --brand:#3d9be0; --brand-ink:#06131d; --soft:#1c3345; --danger:#ef6a60; --ok:#4cc483;
+  color-scheme:dark;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand)}
+#dlg{position:fixed;inset:0;background:rgba(8,14,20,.55);z-index:20;display:flex;align-items:center;justify-content:center;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+#dlg[hidden]{display:none}
+#dlg .box{background:var(--card);color:var(--text);border-radius:16px;padding:18px;width:100%;max-width:420px;
+  border:1px solid var(--line)}
+#dlgMsg{font-size:16px;white-space:pre-line;max-height:60vh;overflow:auto}
+#dlg .row .btn{margin-top:16px}
+.btn:focus-visible,.chip:focus-visible,nav button:focus-visible,.x:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;font-size:16px;line-height:1.4}
 body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
-header{background:var(--brand);color:var(--brand-ink);padding:14px 16px;position:sticky;top:0;z-index:5;
+header{background:var(--brand);color:var(--brand-ink);padding:14px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
   display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 header h1{font-size:18px;margin:0;font-weight:700}
 header .today{font-size:13px;opacity:.9;white-space:nowrap}
@@ -85,6 +100,28 @@ nav button.on{color:var(--brand);font-weight:700}
   background:var(--text);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;
   opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%;text-align:center}
 #toast.on{opacity:1}
+.promo{display:none;margin-top:10px;border:1px solid var(--ok);border-radius:12px;padding:12px;background:var(--card)}
+.promo.on{display:block}
+.promo .pt{font-weight:700;color:var(--ok)}
+.promo .btn{margin-top:10px;background:var(--ok);font-size:15px;padding:12px;min-height:46px}
+.promo.used{border-color:var(--brand)}
+.promo.used .pt{color:var(--brand)}
+.dots{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.dots i{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--ok)}
+.dots i.f{background:var(--ok)}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:12px;color:var(--muted);font-weight:600;text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{text-align:right;padding:9px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td:first-child{white-space:normal}
+.tbl tr.tot td{font-weight:700;border-bottom:0}
+.tbl td b{color:var(--ok)}
+.chk{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--text);font-weight:400;margin:10px 0 0}
+.chk input{width:22px;height:22px;min-height:0;flex:none;margin:0}
+.recv{font-size:14px;padding:8px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}
+.recv:last-child{border-bottom:0}
+.recv span:last-child{color:var(--muted);white-space:nowrap;font-size:13px}
+.tag{display:inline-block;font-size:11px;font-weight:700;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
 #warn{display:none;background:var(--danger);color:#fff;padding:10px 16px;font-size:14px}
 body.worker .adm{display:none!important}
 body:not(.worker) .wrk{display:none!important}
@@ -105,6 +142,7 @@ body.worker .rec{cursor:default}
     <label for="plate">Улсын дугаар</label>
     <input id="plate" autocomplete="off" autocapitalize="characters" placeholder="1234 УБА">
     <div class="hint" id="plateHint"></div>
+    <div class="promo" id="promo"></div>
 
     <label>Угаалгын төрөл</label>
     <div class="chips" id="svcChips"></div>
@@ -160,7 +198,9 @@ body.worker .rec{cursor:default}
   <div class="stats" id="stats"></div>
   <div class="card"><h2>Төлбөрийн хэлбэрээр</h2><div id="byPay"></div></div>
   <div class="card"><h2>Угаалгын төрлөөр</h2><div id="bySvc"></div></div>
+  <div class="card"><h2>Ажилтны цалин</h2><div id="pay2Wrk"></div></div>
   <div class="card"><h2>Ажилтнаар</h2><div id="byWrk"></div></div>
+  <div class="card"><h2>Байнгын үйлчлүүлэгчид</h2><div id="topCust"></div></div>
   <div class="card"><h2>Утсаар</h2><div id="byDev"></div></div>
   <div class="card"><h2>Өдрөөр</h2><div id="byDay"></div></div>
 </section>
@@ -174,11 +214,26 @@ body.worker .rec{cursor:default}
     <div class="hint" id="sendInfo"></div>
     <button class="btn" id="sendBtn">Шинэ бүртгэлээ илгээх</button>
     <button class="btn ghost" id="sendAll">Бүх бүртгэлээ дахин илгээх</button>
+    <div class="hint">Хэдэн ч удаа, хэзээ ч илгээж болно. Нэг бүртгэл гол утсанд хоёр дахин орохгүй.</div>
     <button class="btn ghost" id="recvBtn">Ирсэн файлыг оруулах</button>
-    <button class="btn ghost adm" id="sendSet">Үнэ, ажилтны жагсаалтыг илгээх</button>
-    <div class="hint wrk">Ажилтны утас зөвхөн гол утаснаас ирсэн үнэ, ажилтны жагсаалтыг хүлээн авна.</div>
+    <button class="btn ghost adm" id="sendSet">Үнэ, ажилтан, урамшууллын мэдээг илгээх</button>
+    <div class="hint adm">Гол утаснаас илгээвэл ажилтны утас үйлчлүүлэгч бүрийн угаалгын тоог мэдэж, урамшууллыг зөв тоолно.</div>
+    <div class="hint wrk">Ажилтны утас зөвхөн гол утаснаас ирсэн үнэ, ажилтан, урамшууллын мэдээг хүлээн авна.</div>
     <button class="btn ghost adm" id="toWorker">Энэ утсыг ажилтны утас болгох</button>
     <button class="btn ghost wrk" id="toMain">Гол утасны горим руу шилжих (PIN)</button>
+  </div>
+  <div class="card adm" id="recvCard" style="display:none">
+    <h2>Хүлээн авсан утаснууд</h2>
+    <div id="recvList"></div>
+  </div>
+  <div class="card adm">
+    <h2>Байнгын үйлчлүүлэгчийн урамшуулал</h2>
+    <label class="chk"><input type="checkbox" id="loyOn"> Урамшуулал идэвхтэй</label>
+    <div class="row" style="align-items:center;margin-top:10px">
+      <div style="flex:2">Хэд дэх угаалга нь үнэгүй вэ?</div>
+      <div><input id="loyN" type="number" inputmode="numeric" min="2" max="50" step="1"></div>
+    </div>
+    <div class="hint" id="loyHint"></div>
   </div>
   <div class="card adm">
     <h2>Угаалгын төрөл ба үнэ</h2>
@@ -186,9 +241,11 @@ body.worker .rec{cursor:default}
     <button class="btn ghost" id="addSvc">+ Төрөл нэмэх</button>
   </div>
   <div class="card adm">
-    <h2>Ажилтнууд</h2>
+    <h2>Ажилтнууд ба цалингийн хувь</h2>
+    <div class="hint" style="margin:0 0 8px">Ажилтан угаасан машины үнийн хэдэн хувийг авах вэ.</div>
     <div id="wrkSet"></div>
     <button class="btn ghost" id="addWrk">+ Ажилтан нэмэх</button>
+    <label class="chk"><input type="checkbox" id="freePct"> Үнэгүй угаалгад ч жинхэнэ үнээр нь хувь бодох</label>
   </div>
   <div class="card adm">
     <h2>Өгөгдөл хадгалах, сэргээх</h2>
@@ -228,6 +285,7 @@ body.worker .rec{cursor:default}
   <button data-p="set"><b>⚙</b>Тохиргоо</button>
 </nav>
 <div id="toast"></div>
+<div id="dlg" hidden role="dialog" aria-modal="true"><div class="box"><div id="dlgMsg"></div><div class="row"><button class="btn ghost" id="dlgNo" type="button">Болих</button><button class="btn" id="dlgYes" type="button">Тийм</button></div></div></div>
 
 <script>
 (function(){
@@ -249,9 +307,18 @@ function defaults(){
     lastBackup:null,
     device:'',
     role:null,
-    pin:null
+    pin:null,
+    pct:{},          /* ажилтны нэр -> цалингийн хувь */
+    freePct:true,    /* үнэгүй угаалгад жинхэнэ үнээр хувь бодох */
+    loyOn:true, loyN:10,
+    ext:[],          /* гол утаснаас ирсэн үйлчлүүлэгчийн угаалгын товч жагсаалт */
+    extAt:null,
+    recv:{},         /* утас бүрээс хүлээн авсан мэдээ */
+    dupIds:{},       /* өөр утсанд давхар бүртгэгдсэн тул алгассан бүртгэлүүд */
+    lastSent:null
   };
 }
+var DEF_PCT=30;
 function load(){
   try{
     var t='__t'; localStorage.setItem(t,'1'); localStorage.removeItem(t);
@@ -268,6 +335,13 @@ function normalize(d){
   if(typeof d.device!=='string') d.device='';
   if(d.role!=='main'&&d.role!=='worker') d.role=null;
   if(typeof d.pin!=='string') d.pin=null;
+  ['pct','recv','dupIds'].forEach(function(k){ if(!d[k]||typeof d[k]!=='object'||Array.isArray(d[k])) d[k]={}; });
+  if(!Array.isArray(d.ext)) d.ext=[];
+  if(typeof d.freePct!=='boolean') d.freePct=true;
+  if(typeof d.loyOn!=='boolean') d.loyOn=true;
+  if(!(d.loyN>=2)) d.loyN=10;
+  if(!('extAt' in d)) d.extAt=null;
+  if(!('lastSent' in d)) d.lastSent=null;
   return d;
 }
 function save(){
@@ -292,10 +366,54 @@ function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 var toastT;
 function toast(m){var t=$('toast');t.textContent=m;t.classList.add('on');
   clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('on');},2200);}
+/* Апп доторх асуулт: хөтөчийн confirm/alert зарим орчинд ажилладаггүй */
+var dlgQ=[],dlgCur=null;
+function ask(msg,yes,no){
+  return new Promise(function(res){ dlgQ.push({msg:msg,yes:yes||'Тийм',no:no===null?null:(no||'Болих'),res:res}); dlgNext(); });
+}
+function notify(msg){ return ask(msg,'Ойлголоо',null); }
+function dlgNext(){
+  if(dlgCur||!dlgQ.length) return;
+  dlgCur=dlgQ.shift();
+  $('dlgMsg').textContent=dlgCur.msg; $('dlgYes').textContent=dlgCur.yes;
+  $('dlgNo').hidden=dlgCur.no===null; $('dlgNo').textContent=dlgCur.no||'';
+  $('dlg').hidden=false; try{$('dlgYes').focus();}catch(e){}
+}
+function dlgDone(v){ var c=dlgCur; dlgCur=null; $('dlg').hidden=true; if(c) c.res(v); dlgNext(); }
+$('dlgYes').addEventListener('click',function(){dlgDone(true);});
+$('dlgNo').addEventListener('click',function(){dlgDone(false);});
 function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function mins(t){var a=String(t||'0:0').split(':');return (+a[0]||0)*60+(+a[1]||0);}
+function svcPrice(name){var s=db.services.filter(function(x){return x.name===name;})[0];return s?s.price:0;}
+
+/* ---------- цалин ---------- */
+function pctOf(w){var p=db.pct[w];return (typeof p==='number'&&p>=0)?p:DEF_PCT;}
+function commBase(r){return r.free?(db.freePct?(+r.list||0):0):(+r.price||0);}
+function comm(r){return r.worker?commBase(r)*pctOf(r.worker)/100:0;}
+
+/* ---------- байнгын үйлчлүүлэгч ---------- */
+/* Энэ утсан дээрх бүртгэл + үндсэн утаснаас ирсэн товч жагсаалтыг id-аар нэгтгэнэ (давхар тоолохгүй) */
+function visits(pk){
+  var seen={},out=[];
+  db.records.forEach(function(r){
+    if(plateKey(r.plate)!==pk) return; seen[r.id]=1;
+    if(r.del||db.dupIds[r.id]) return;
+    out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service});
+  });
+  db.ext.forEach(function(e){
+    if(!e||e.p!==pk||seen[e.i]||db.dupIds[e.i]) return; seen[e.i]=1;
+    out.push({id:e.i,date:e.d,time:e.t,free:!!e.f,service:e.s||''});
+  });
+  return out.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
+}
+function loyalty(pk,exceptId){
+  var v=visits(pk).filter(function(x){return x.id!==exceptId;}), n=0;
+  v.forEach(function(x){ n = x.free ? 0 : n+1; });
+  return {total:v.length, last:v[v.length-1]||null, n:n, due:db.loyOn && n>=db.loyN-1};
+}
 
 /* ---------- add / edit form ---------- */
-var sel={svc:null,wrk:null,pay:PAYS[0]}, editId=null;
+var sel={svc:null,wrk:null,pay:PAYS[0],free:false}, editId=null;
 
 function drawChips(){
   $('svcChips').innerHTML=db.services.map(function(s){
@@ -310,8 +428,8 @@ function resetForm(){
   editId=null; var now=new Date();
   $('plate').value=''; $('price').value=''; $('note').value='';
   $('date').value=dstr(now); $('time').value=tstr(now);
-  sel.svc=null; sel.pay=PAYS[0]; /* ажилтныг хэвээр үлдээнэ */
-  $('plateHint').innerHTML='';
+  sel.svc=null; sel.pay=PAYS[0]; sel.free=false; /* ажилтныг хэвээр үлдээнэ */
+  $('plateHint').innerHTML=''; drawPromo(null);
   $('saveBtn').textContent='Хадгалах';
   $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
   drawChips();
@@ -319,7 +437,7 @@ function resetForm(){
 $('svcChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-svc]'); if(!b) return;
   var s=db.services.filter(function(x){return x.id===b.getAttribute('data-svc');})[0]; if(!s) return;
-  sel.svc=s.name; $('price').value=s.price; drawChips();
+  sel.svc=s.name; $('price').value=sel.free?0:s.price; drawChips();
 });
 $('wrkChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-wrk]'); if(!b) return;
@@ -329,14 +447,46 @@ $('payChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-pay]'); if(!b) return;
   sel.pay=PAYS[+b.getAttribute('data-pay')]; drawChips();
 });
-$('plate').addEventListener('input',function(){
-  var k=plateKey(this.value), h=$('plateHint');
-  if(k.length<4){h.innerHTML='';return;}
-  var prev=live().filter(function(r){return plateKey(r.plate)===k && r.id!==editId;});
-  if(!prev.length){h.innerHTML='Шинэ үйлчлүүлэгч';return;}
-  prev.sort(function(a,b){return (b.date+b.time).localeCompare(a.date+a.time);});
-  h.innerHTML='<b>Байнгын үйлчлүүлэгч</b> · өмнө нь '+prev.length+' удаа · сүүлд '+esc(prev[0].date)+' ('+esc(prev[0].service)+')';
+function drawPlateInfo(){
+  var k=plateKey($('plate').value), h=$('plateHint');
+  if(k.length<4){h.innerHTML='';drawPromo(null);return;}
+  var L=loyalty(k,editId);
+  if(!L.total){h.innerHTML='Шинэ үйлчлүүлэгч';}
+  else{
+    h.innerHTML='<b>Байнгын үйлчлүүлэгч</b> · өмнө нь '+L.total+' удаа · сүүлд '+esc(L.last.date)+
+      (L.last.service?' ('+esc(L.last.service)+')':'');
+  }
+  drawPromo(L);
+}
+function drawPromo(L){
+  var box=$('promo'), N=db.loyN;
+  if(sel.free){
+    box.className='promo on used';
+    box.innerHTML='<div class="pt">Урамшууллын үнэгүй угаалга сонгогдсон</div>'+
+      '<button type="button" class="btn ghost" id="promoOff">Болих, үнэтэй болгох</button>';
+    return;
+  }
+  if(!L||!db.loyOn){box.className='promo';box.innerHTML='';return;}
+  if(L.due){
+    box.className='promo on';
+    box.innerHTML='<div class="pt">Энэ бол '+N+' дахь угаалга. Үнэгүй!</div>'+
+      '<div class="hint" style="margin-top:2px">Өмнөх урамшууллаас хойш '+L.n+' удаа төлбөртэй угаалгасан.</div>'+
+      '<button type="button" class="btn" id="promoOn">Үнэгүй болгох</button>';
+    return;
+  }
+  if(L.n>0){
+    var dots=''; for(var i=0;i<N-1;i++) dots+='<i'+(i<L.n?' class="f"':'')+'></i>';
+    box.className='promo on';
+    box.innerHTML='<div class="hint" style="margin:0">Урамшуулал хүртэл '+(N-1-L.n)+' угаалга үлдлээ ('+L.n+'/'+(N-1)+')</div><div class="dots">'+dots+'</div>';
+    return;
+  }
+  box.className='promo'; box.innerHTML='';
+}
+$('promo').addEventListener('click',function(e){
+  if(e.target.id==='promoOn'){ sel.free=true; $('price').value=0; drawPlateInfo(); toast('Үнэгүй угаалга'); }
+  if(e.target.id==='promoOff'){ sel.free=false; $('price').value=sel.svc?svcPrice(sel.svc):''; drawPlateInfo(); }
 });
+$('plate').addEventListener('input',drawPlateInfo);
 $('saveBtn').addEventListener('click',function(){
   var plate=normPlate($('plate').value), price=parseFloat($('price').value);
   if(!plate){toast('Улсын дугаараа оруулна уу');$('plate').focus();return;}
@@ -344,33 +494,48 @@ $('saveBtn').addEventListener('click',function(){
   if(isNaN(price)||price<0){toast('Үнээ оруулна уу');$('price').focus();return;}
   var now=new Date();
   var old=editId?db.records.filter(function(x){return x.id===editId;})[0]:null;
-  var rec={id:editId||uid(),plate:plate,service:sel.svc,price:price,worker:sel.wrk||'',
+  var rec={id:editId||uid(),plate:plate,service:sel.svc,price:sel.free?0:price,worker:sel.wrk||'',
     pay:sel.pay,date:$('date').value||dstr(now),time:$('time').value||tstr(now),note:$('note').value.trim(),
     dev:old?(old.dev||''):db.device,upd:Date.now(),sent:false};
+  if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); }
+  if(!editId){
+    var pk=plateKey(plate), m=mins(rec.time);
+    var near=live().filter(function(r){return plateKey(r.plate)===pk&&r.date===rec.date&&Math.abs(mins(r.time)-m)<=15;})[0];
+    if(near){
+      ask(plate+' машин '+(rec.date===dstr(new Date())?'өнөөдөр ':rec.date+'-нд ')+near.time+' цагт аль хэдийн бүртгэгдсэн байна. Дахин бүртгэх үү?','Дахин бүртгэх')
+        .then(function(ok){ if(ok) commitRec(rec); });
+      return;
+    }
+  }
+  commitRec(rec);
+});
+function commitRec(rec){
   if(editId){
     for(var i=0;i<db.records.length;i++) if(db.records[i].id===editId){db.records[i]=rec;break;}
     toast('Засвар хадгалагдлаа');
   }else{
-    db.records.push(rec); toast('Хадгаллаа: '+plate+' · '+money(price));
+    db.records.push(rec); toast('Хадгаллаа: '+rec.plate+' · '+money(rec.price));
   }
   save(); resetForm(); refreshAll();
   if(document.querySelector('nav button.on').getAttribute('data-p')!=='add') show('list');
-});
+}
 $('cancelEdit').addEventListener('click',function(){resetForm();show('list');});
 $('delBtn').addEventListener('click',function(){
-  if(!editId||!confirm('Энэ бүртгэлийг устгах уу?')) return;
-  db.records.forEach(function(r){if(r.id===editId){r.del=true;r.upd=Date.now();r.sent=false;}});
-  save(); resetForm(); refreshAll(); show('list'); toast('Устгалаа');
+  if(!editId) return; var id=editId;
+  ask('Энэ бүртгэлийг устгах уу?','Устгах').then(function(ok){ if(!ok) return;
+    db.records.forEach(function(r){if(r.id===id){r.del=true;r.upd=Date.now();r.sent=false;}});
+    save(); resetForm(); refreshAll(); show('list'); toast('Устгалаа');
+  });
 });
 function startEdit(id){
   if(db.role!=='main') return;
   var r=db.records.filter(function(x){return x.id===id;})[0]; if(!r) return;
   editId=id; $('plate').value=r.plate; $('price').value=r.price; $('note').value=r.note||'';
   $('date').value=r.date; $('time').value=r.time;
-  sel.svc=r.service; sel.wrk=r.worker||null; sel.pay=r.pay||PAYS[0];
+  sel.svc=r.service; sel.wrk=r.worker||null; sel.pay=r.pay||PAYS[0]; sel.free=!!r.free;
   $('saveBtn').textContent='Засварыг хадгалах';
   $('cancelEdit').style.display='block'; $('delBtn').style.display='block';
-  $('plateHint').innerHTML=''; drawChips(); show('add'); window.scrollTo(0,0);
+  drawPlateInfo(); drawChips(); show('add'); window.scrollTo(0,0);
 }
 
 /* ---------- list ---------- */
@@ -384,7 +549,7 @@ function drawList(){
   $('listSum').textContent=rows.length+' машин · нийт '+money(tot)+(q?' (бүх өдрөөс хайсан)':'');
   var shown=rows.slice(0,300);
   $('listBox').innerHTML=shown.length?shown.map(function(r){
-    return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+'</div>'+
+    return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+(r.free?'<span class="tag">ҮНЭГҮЙ</span>':'')+'</div>'+
       '<div class="s">'+esc(r.service)+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
       '<div class="amt">'+money(r.price)+'<small>'+(q?esc(r.date)+' ':'')+esc(r.time)+' · '+esc(r.pay)+'</small></div></div>';
   }).join('')+(rows.length>shown.length?'<div class="empty">Эхний 300-г харууллаа</div>':'')
@@ -431,13 +596,44 @@ function drawReport(){
     '<div class="stat"><div class="k">Угаасан машин</div><div class="v">'+rows.length+'</div></div>'+
     '<div class="stat"><div class="k">Дундаж үнэ</div><div class="v">'+money(rows.length?tot/rows.length:0)+'</div></div>'+
     '<div class="stat"><div class="k">Давхардаагүй машин</div><div class="v">'+Object.keys(uniq).length+'</div></div>'+
-    '<div class="stat"><div class="k">Өдрийн дундаж орлого</div><div class="v">'+money(days.length?tot/days.length:0)+'</div></div>';
+    '<div class="stat"><div class="k">Өдрийн дундаж орлого</div><div class="v">'+money(days.length?tot/days.length:0)+'</div></div>'+
+    (function(){var f=rows.filter(function(r){return r.free;}); return f.length?
+      '<div class="stat wide"><div class="k">Урамшууллын үнэгүй угаалга</div><div class="v">'+f.length+
+      ' <span style="font-size:14px;font-weight:400;color:var(--muted)">· '+money(f.reduce(function(s,r){return s+(+r.list||0);},0))+'-ийн үнэ</span></div></div>':'';})();
+  drawSalary(rows); drawTopCust(rows);
   var by=function(k){return group(rows,k).sort(function(a,b){return b.sum-a.sum;});};
   $('byPay').innerHTML=bars(by('pay'),tot);
   $('bySvc').innerHTML=bars(by('service'),tot);
   $('byWrk').innerHTML=bars(by('worker'),tot);
   $('byDev').innerHTML=bars(by('dev'),tot);
   $('byDay').innerHTML=bars(days.sort(function(a,b){return b.k.localeCompare(a.k);}).slice(0,62),tot);
+}
+function drawSalary(rows){
+  var m={},out=[];
+  rows.forEach(function(r){
+    if(!r.worker) return;
+    if(!m[r.worker]){m[r.worker]={w:r.worker,n:0,rev:0,pay:0};out.push(m[r.worker]);}
+    var x=m[r.worker]; x.n++; x.rev+=(+r.price||0); x.pay+=comm(r);
+  });
+  if(!out.length){$('pay2Wrk').innerHTML='<div class="empty">Ажилтан сонгосон бүртгэл алга</div>';return;}
+  out.sort(function(a,b){return b.pay-a.pay;});
+  var tn=0,tr=0,tp=0;
+  var html='<table class="tbl"><tr><th>Ажилтан</th><th>Машин</th><th>Орлого</th><th>Цалин</th></tr>'+
+    out.map(function(x){tn+=x.n;tr+=x.rev;tp+=x.pay;
+      return '<tr><td>'+esc(x.w)+' <span style="color:var(--muted);font-size:12px">'+pctOf(x.w)+'%</span></td><td>'+x.n+'</td><td>'+money(x.rev)+'</td><td><b>'+money(x.pay)+'</b></td></tr>';}).join('')+
+    '<tr class="tot"><td>Нийт</td><td>'+tn+'</td><td>'+money(tr)+'</td><td>'+money(tp)+'</td></tr></table>';
+  var noW=rows.filter(function(r){return !r.worker;}).length;
+  if(noW) html+='<div class="hint">'+noW+' бүртгэлд ажилтан сонгоогүй тул цалинд ороогүй.</div>';
+  $('pay2Wrk').innerHTML=html;
+}
+function drawTopCust(rows){
+  var m={},out=[];
+  rows.forEach(function(r){var k=plateKey(r.plate);
+    if(!m[k]){m[k]={p:r.plate,n:0,sum:0};out.push(m[k]);} m[k].n++; m[k].sum+=(+r.price||0);});
+  out=out.filter(function(x){return x.n>=2;}).sort(function(a,b){return b.n-a.n||b.sum-a.sum;}).slice(0,10);
+  $('topCust').innerHTML=out.length?'<table class="tbl"><tr><th>Дугаар</th><th>Удаа</th><th>Төлсөн</th></tr>'+
+    out.map(function(x){return '<tr><td>'+esc(x.p)+'</td><td>'+x.n+'</td><td>'+money(x.sum)+'</td></tr>';}).join('')+'</table>'
+    :'<div class="empty">Энэ хугацаанд 2-оос дээш удаа ирсэн машин алга</div>';
 }
 $('period').addEventListener('change',drawReport);
 
@@ -449,10 +645,21 @@ function drawSettings(){
       '<button class="x" data-sx="'+i+'" aria-label="Устгах">×</button></div>';}).join('');
   $('wrkSet').innerHTML=db.workers.map(function(w,i){
     return '<div class="setrow"><input data-wn="'+i+'" value="'+esc(w)+'" placeholder="Нэр">'+
+      '<input class="pr" style="max-width:76px" data-wp="'+i+'" type="number" inputmode="numeric" min="0" max="100" value="'+pctOf(w)+'"><span>%</span>'+
       '<button class="x" data-wx="'+i+'" aria-label="Устгах">×</button></div>';}).join('');
+  $('freePct').checked=db.freePct;
+  $('loyOn').checked=db.loyOn; $('loyN').value=db.loyN;
+  $('loyHint').textContent=db.loyOn?('Машин бүрийн '+(db.loyN-1)+' төлбөртэй угаалгын дараах '+db.loyN+' дахь нь үнэгүй.'+
+    (db.extAt?' Үндсэн утасны мэдээ: '+String(db.extAt).slice(0,10):'')):'Урамшуулал унтраалттай.';
   $('devName').value=db.device;
   var un=db.records.filter(function(r){return !r.sent;}).length;
-  $('sendInfo').textContent='Илгээгээгүй бүртгэл: '+un;
+  $('sendInfo').textContent='Илгээгээгүй бүртгэл: '+un+(db.lastSent?' · сүүлд илгээсэн: '+db.lastSent:'');
+  var devs=Object.keys(db.recv);
+  $('recvCard').style.display=devs.length?'block':'none';
+  $('recvList').innerHTML=devs.sort().map(function(dv){
+    var n=live().filter(function(r){return r.dev===dv;}).length, x=db.recv[dv]||{};
+    return '<div class="recv"><span><b>'+esc(dv)+'</b> · '+n+' бүртгэл</span><span>сүүлд '+esc(x.last||'')+'</span></div>';
+  }).join('');
   $('backupInfo').textContent='Нийт '+live().length+' бүртгэл · сүүлийн нөөц: '+(db.lastBackup||'аваагүй');
 }
 $('svcSet').addEventListener('change',function(e){
@@ -463,26 +670,51 @@ $('svcSet').addEventListener('change',function(e){
 });
 $('svcSet').addEventListener('click',function(e){
   var b=e.target.closest('[data-sx]'); if(!b) return;
-  if(!confirm('Энэ төрлийг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.')) return;
-  db.services.splice(+b.getAttribute('data-sx'),1); save(); drawSettings(); drawChips();
+  var i=+b.getAttribute('data-sx');
+  ask('"'+db.services[i].name+'" төрлийг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
+    if(!ok) return; db.services.splice(i,1); save(); drawSettings(); drawChips(); });
 });
 $('addSvc').addEventListener('click',function(){
   db.services.push({id:uid(),name:'Шинэ төрөл',price:0}); save(); drawSettings(); drawChips();
 });
 $('wrkSet').addEventListener('change',function(e){
-  var t=e.target; if(!t.hasAttribute('data-wn')) return;
-  db.workers[+t.getAttribute('data-wn')]=t.value.trim()||'Нэргүй'; sel.wrk=null; save(); drawChips();
+  var t=e.target;
+  if(t.hasAttribute('data-wp')){
+    var v=parseFloat(t.value); if(isNaN(v)||v<0) v=0; if(v>100) v=100;
+    db.pct[db.workers[+t.getAttribute('data-wp')]]=v; t.value=v; save(); return;
+  }
+  if(!t.hasAttribute('data-wn')) return;
+  var i=+t.getAttribute('data-wn'), oldN=db.workers[i], nw=t.value.trim()||'Нэргүй';
+  if(oldN in db.pct && !(nw in db.pct)){ db.pct[nw]=db.pct[oldN]; delete db.pct[oldN]; }
+  db.workers[i]=nw; sel.wrk=null; save(); drawChips();
+});
+$('freePct').addEventListener('change',function(){db.freePct=this.checked;save();});
+$('loyOn').addEventListener('change',function(){db.loyOn=this.checked;save();drawSettings();drawPlateInfo();});
+$('loyN').addEventListener('change',function(){
+  var v=Math.round(parseFloat(this.value)); if(!(v>=2)) v=2; if(v>50) v=50;
+  db.loyN=v; save(); drawSettings(); drawPlateInfo();
 });
 $('wrkSet').addEventListener('click',function(e){
   var b=e.target.closest('[data-wx]'); if(!b) return;
-  if(!confirm('Энэ ажилтныг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.')) return;
-  db.workers.splice(+b.getAttribute('data-wx'),1); sel.wrk=null; save(); drawSettings(); drawChips();
+  var i=+b.getAttribute('data-wx');
+  ask('"'+db.workers[i]+'" ажилтныг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
+    if(!ok) return; db.workers.splice(i,1); sel.wrk=null; save(); drawSettings(); drawChips(); });
 });
 $('addWrk').addEventListener('click',function(){
   db.workers.push('Ажилтан '+(db.workers.length+1)); save(); drawSettings(); drawChips();
 });
 
+/* Claude-ийн апп дотор нээсэн үед файлыг тэндхийн хадгалах цонхоор өгнө (iPhone дээр хуваалцах цэс гарна) */
+var dlCap=null;
+try{ if(window.claude&&typeof window.claude.use==='function')
+  window.claude.use('downloads').then(function(d){dlCap=d;},function(){}); }catch(e){}
 function download(name,text,type){
+  if(dlCap){
+    return dlCap.save({filename:name,data:text}).then(function(){return true;},function(e){
+      if(!(e&&e.code==='declined')) toast('Файлыг гаргаж чадсангүй. Дахин оролдоно уу.');
+      return false;
+    });
+  }
   var blob=new Blob([text],{type:type}), file=null;
   function saveAs(){
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
@@ -504,8 +736,8 @@ function csvCell(v){v=String(v==null?'':v); return /[",\n;]/.test(v)?'"'+v.repla
 $('expCsv').addEventListener('click',function(){
   if(!live().length){toast('Бүртгэл алга');return;}
   var rows=live().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
-  var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Үнэ','Ажилтан','Төлбөр','Тэмдэглэл','Утас'].join(',')];
-  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,r.price,r.worker,r.pay,r.note,r.dev||''].map(csvCell).join(','));});
+  var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Үнэ','Урамшуулал','Ажилтан','Ажилтны цалин','Төлбөр','Тэмдэглэл','Утас'].join(',')];
+  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,r.price,r.free?'Үнэгүй':'',r.worker,Math.round(comm(r)),r.pay,r.note,r.dev||''].map(csvCell).join(','));});
   download('ugaalga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
 });
 $('expJson').addEventListener('click',function(){
@@ -516,30 +748,51 @@ $('expJson').addEventListener('click',function(){
 $('impBtn').addEventListener('click',function(){$('impFile').click();});
 $('recvBtn').addEventListener('click',function(){$('impFile').click();});
 
-function mergeFile(d,res,had){
+function mergeFile(d,res,had,setOK){
   if(!d||typeof d!=='object') throw 0;
   var isSet=d.kind==='settings';
   if(db.role==='worker'&&!isSet) throw 0;
   if(!isSet&&!Array.isArray(d.records)) throw 0;
   if(Array.isArray(d.records)){
     var idx={}; db.records.forEach(function(r,i){idx[r.id]=i;});
+    /* Өөр утсанд нэг машиныг давхар бүртгэсэн эсэхийг шалгах түлхүүр: дугаар + огноо + төрөл */
+    var fp={};
+    function fpKey(r){return plateKey(r.plate)+'|'+r.date+'|'+r.service;}
+    db.records.forEach(function(r){ if(r.del) return; var k=fpKey(r); (fp[k]=fp[k]||[]).push(r); });
     d.records.forEach(function(r){
       if(!r||typeof r!=='object'||!r.id) return;
       var c={},k; for(k in r) c[k]=r[k];
       if(d.kind==='send') c.sent=true;
       if(!c.dev&&d.device) c.dev=d.device;
       if(!(c.id in idx)){
-        idx[c.id]=db.records.length; db.records.push(c); if(!c.del) res.add++;
+        if(db.dupIds[c.id]){ res.same++; return; }          /* өмнө нь давхар гэж алгассан */
+        if(!c.del){
+          var twin=(fp[fpKey(c)]||[]).filter(function(x){
+            return x.id!==c.id && (x.dev||'')!==(c.dev||'') && Math.abs(mins(x.time)-mins(c.time))<=10;})[0];
+          if(twin){ db.dupIds[c.id]=1; res.dup++; res.dupList.push(c.plate+' '+c.time); return; }
+        }
+        idx[c.id]=db.records.length; db.records.push(c);
+        if(!c.del){ res.add++; var fk=fpKey(c); (fp[fk]=fp[fk]||[]).push(c); }
       }else{
         var l=db.records[idx[c.id]];
         if((c.upd||0)>(l.upd||0)){
           db.records[idx[c.id]]=c;
           if(c.del&&!l.del) res.del++; else res.upd++;
-        }
+        }else res.same++;
       }
     });
+    if(d.kind==='send'&&d.device){
+      var at=d.at?new Date(d.at):new Date(); if(isNaN(at)) at=new Date();
+      var prev=db.recv[d.device]||{};
+      var lbl=dstr(at)+' '+tstr(at);
+      if(!prev.last||lbl>prev.last) db.recv[d.device]={last:lbl};
+    }
   }
-  var takeSet=isSet?confirm('Үнэ, ажилтны жагсаалтыг ирсэн файлынхаар солих уу?'):(d.kind!=='send'&&!had);
+  if(isSet){
+    if(Array.isArray(d.cust)){ db.ext=d.cust.filter(function(e){return e&&e.i&&e.p;}); db.extAt=d.at||null; res.cust=true; }
+    if(Array.isArray(d.dup)) d.dup.forEach(function(id){ db.dupIds[id]=1; });
+  }
+  var takeSet=isSet?!!setOK:(d.kind!=='send'&&!had);
   if(takeSet){
     if(Array.isArray(d.services)){
       db.services=d.services.filter(function(x){return x&&x.name;}).map(function(x){
@@ -549,27 +802,39 @@ function mergeFile(d,res,had){
     if(Array.isArray(d.workers)){
       db.workers=d.workers.filter(function(x){return typeof x==='string'&&x;}); res.set=true;
     }
+    if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
+    if(d.loyN>=2) db.loyN=Math.round(d.loyN);
+    if(d.kind==='backup'){
+      ['pct','freePct','ext','extAt','recv','dupIds'].forEach(function(k){ if(k in d) db[k]=d[k]; });
+      normalize(db);
+    }
     if(!isSet&&!db.device&&typeof d.device==='string') db.device=d.device;
   }
 }
 $('impFile').addEventListener('change',function(){
   var files=Array.prototype.slice.call(this.files), inp=this; if(!files.length) return;
-  var res={add:0,upd:0,del:0,bad:0,set:false}, had=live().length>0, i=0;
+  var res={add:0,upd:0,del:0,bad:0,same:0,dup:0,dupList:[],set:false,cust:false}, had=live().length>0, i=0;
   (function next(){
     if(i>=files.length){
       sel.wrk=null; save(); refreshAll(); drawChips(); inp.value='';
       var m=[res.add+' шинэ бүртгэл нэмэгдлээ'];
       if(res.upd) m.push(res.upd+' бүртгэл шинэчлэгдлээ');
       if(res.del) m.push(res.del+' бүртгэл устгагдлаа');
+      if(res.same) m.push(res.same+' бүртгэл өмнө нь орсон тул дахин нэмээгүй');
+      if(res.dup) m.push(res.dup+' бүртгэл өөр утсанд аль хэдийн бүртгэгдсэн машин тул алгаслаа: '+res.dupList.slice(0,5).join(', ')+(res.dupList.length>5?'…':''));
       if(res.set) m.push('Үнэ, ажилтны жагсаалт солигдлоо');
+      if(res.cust) m.push('Үйлчлүүлэгчдийн угаалгын тоо шинэчлэгдлээ');
       if(res.bad) m.push(res.bad+' файлыг уншиж чадсангүй');
-      alert(m.join('\n'));
+      notify(m.join('\n'));
       return;
     }
     var rd=new FileReader();
     rd.onload=function(){
-      try{ mergeFile(JSON.parse(String(rd.result).replace(/^﻿/,'')),res,had); }catch(e){ res.bad++; }
-      i++; next();
+      var d=null;
+      try{ d=JSON.parse(String(rd.result).replace(/^\uFEFF/,'')); }catch(e){ res.bad++; i++; next(); return; }
+      var go=function(ok){ try{ mergeFile(d,res,had,ok); }catch(e){ res.bad++; } i++; next(); };
+      if(d&&d.kind==='settings') ask('Үнэ, ажилтан, урамшууллын тохиргоог ирсэн файлынхаар солих уу?\n(Үйлчлүүлэгчдийн угаалгын тоо ямар ч үед шинэчлэгдэнэ.)','Солих','Хэвээр үлдээх').then(go);
+      else go(false);
     };
     rd.onerror=function(){ res.bad++; i++; next(); };
     rd.readAsText(files[i]);
@@ -584,24 +849,42 @@ function sendRecords(all){
   var ids={}; rows.forEach(function(r){ids[r.id]=r.upd||0;});
   var now=new Date();
   var payload={app:KEY,kind:'send',device:db.device,at:now.toISOString(),records:rows};
-  download('ugaalga-'+devSlug()+'-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',JSON.stringify(payload),'text/plain')
+  download('ugaalga-'+devSlug()+'-'+dstr(now)+'-'+tstr(now).replace(':','')+p2(now.getSeconds())+'.txt',JSON.stringify(payload),'text/plain')
   .then(function(ok){
     if(!ok){toast('Илгээлт цуцлагдлаа');return;}
     db.records.forEach(function(r){if((r.id in ids)&&(r.upd||0)===ids[r.id]) r.sent=true;});
+    db.lastSent=dstr(now)+' '+tstr(now);
     save(); drawSettings(); toast(rows.length+' бүртгэлийг файл болгож гаргалаа');
   });
 }
 $('sendBtn').addEventListener('click',function(){sendRecords(false);});
 $('sendAll').addEventListener('click',function(){sendRecords(true);});
+/* Машин бүрийн сүүлийн урамшууллаас хойших угаалгуудыг товч жагсаалт болгоно (бусад утас урамшууллыг зөв тоолохын тулд) */
+function custSummary(){
+  var cut=dstr(addDays(new Date(),-400)), by={}, out=[];
+  db.records.forEach(function(r){ if(r.date>=cut) by[plateKey(r.plate)]=1; });
+  db.ext.forEach(function(e){ if(e&&e.d>=cut) by[e.p]=1; });
+  Object.keys(by).forEach(function(pk){
+    var v=visits(pk), from=0;
+    for(var j=v.length-1;j>=0;j--) if(v[j].free){from=j;break;}
+    v.slice(from).slice(-(db.loyN+1)).forEach(function(x){
+      out.push({i:x.id,p:pk,d:x.date,t:x.time,f:x.free?1:0,s:x.service});
+    });
+  });
+  return out;
+}
 $('sendSet').addEventListener('click',function(){
-  download('ugaalga-tohirgoo-'+dstr(new Date())+'.txt',
-    JSON.stringify({app:KEY,kind:'settings',services:db.services,workers:db.workers}),'text/plain');
+  var now=new Date();
+  download('ugaalga-tohirgoo-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',
+    JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,
+      loyOn:db.loyOn,loyN:db.loyN,cust:custSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
 $('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
 $('wipe').addEventListener('click',function(){
-  if(!confirm('Бүх бүртгэлийг устгах уу? Буцаах боломжгүй.')) return;
-  if(!confirm('Итгэлтэй байна уу? '+live().length+' бүртгэл устна.')) return;
-  db.records=[]; save(); refreshAll(); toast('Устгалаа');
+  ask('Бүх бүртгэлийг устгах уу? Буцаах боломжгүй.','Үргэлжлүүлэх').then(function(ok){ if(!ok) return;
+    return ask('Итгэлтэй байна уу? '+live().length+' бүртгэл устна.','Бүгдийг устгах').then(function(ok2){ if(!ok2) return;
+      db.records=[]; save(); refreshAll(); toast('Устгалаа'); });
+  });
 });
 
 /* ---------- nav ---------- */
