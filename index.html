@@ -15,17 +15,20 @@
 :root{
   --bg:#f3f6f9; --card:#ffffff; --text:#16212b; --muted:#6a7885; --line:#dfe6ec;
   --brand:#0f6fb8; --brand-ink:#ffffff; --soft:#e6f1fa; --danger:#c8372d; --ok:#1d8a4e;
+  --note:#fff6db; --note-line:#e0b23c; --note-ink:#5a4300;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0e151b; --card:#17212a; --text:#e8eef3; --muted:#93a2af; --line:#283642;
     --brand:#3d9be0; --brand-ink:#06131d; --soft:#1c3345; --danger:#ef6a60; --ok:#4cc483;
+    --note:#2e2612; --note-line:#a8832a; --note-ink:#f2d58a;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0e151b; --card:#17212a; --text:#e8eef3; --muted:#93a2af; --line:#283642;
   --brand:#3d9be0; --brand-ink:#06131d; --soft:#1c3345; --danger:#ef6a60; --ok:#4cc483;
+  --note:#2e2612; --note-line:#a8832a; --note-ink:#f2d58a;
   color-scheme:dark;
 }
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand)}
@@ -100,6 +103,13 @@ nav button.on{color:var(--brand);font-weight:700}
   background:var(--text);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;
   opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%;text-align:center}
 #toast.on{opacity:1}
+.notes{display:none;margin-top:10px;border:1px solid var(--note-line);border-radius:12px;padding:10px 12px;background:var(--note);color:var(--note-ink)}
+.notes.on{display:block}
+.notes .nt{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:4px}
+.notes .ni{font-size:15px;padding:4px 0;border-top:1px solid var(--note-line)}
+.notes .ni:first-of-type{border-top:0}
+.notes .ni small{display:block;font-size:12px;opacity:.8}
+.notes button{margin-top:6px;border:1px solid var(--note-line);background:transparent;color:var(--note-ink);border-radius:10px;padding:8px 12px;font:inherit;font-size:14px;min-height:40px;cursor:pointer}
 .promo{display:none;margin-top:10px;border:1px solid var(--ok);border-radius:12px;padding:12px;background:var(--card)}
 .promo.on{display:block}
 .promo .pt{font-weight:700;color:var(--ok)}
@@ -142,6 +152,7 @@ body.worker .rec{cursor:default}
     <label for="plate">Улсын дугаар</label>
     <input id="plate" autocomplete="off" autocapitalize="characters" placeholder="1234 УБА">
     <div class="hint" id="plateHint"></div>
+    <div class="notes" id="pNotes" role="note"></div>
     <div class="promo" id="promo"></div>
 
     <label>Угаалгын төрөл</label>
@@ -311,6 +322,7 @@ function defaults(){
     pct:{},          /* ажилтны нэр -> цалингийн хувь */
     freePct:true,    /* үнэгүй угаалгад жинхэнэ үнээр хувь бодох */
     loyOn:true, loyN:10,
+    extNotes:{},     /* гол утаснаас ирсэн машин бүрийн сүүлийн тэмдэглэлүүд */
     ext:[],          /* гол утаснаас ирсэн үйлчлүүлэгчийн угаалгын товч жагсаалт */
     extAt:null,
     recv:{},         /* утас бүрээс хүлээн авсан мэдээ */
@@ -337,6 +349,7 @@ function normalize(d){
   if(typeof d.pin!=='string') d.pin=null;
   ['pct','recv','dupIds'].forEach(function(k){ if(!d[k]||typeof d[k]!=='object'||Array.isArray(d[k])) d[k]={}; });
   if(!Array.isArray(d.ext)) d.ext=[];
+  if(!d.extNotes||typeof d.extNotes!=='object'||Array.isArray(d.extNotes)) d.extNotes={};
   if(typeof d.freePct!=='boolean') d.freePct=true;
   if(typeof d.loyOn!=='boolean') d.loyOn=true;
   if(!(d.loyN>=2)) d.loyN=10;
@@ -406,6 +419,36 @@ function visits(pk){
   });
   return out.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
 }
+/* Машины өмнөх тэмдэглэлүүд: энэ утсан дээрх бүртгэл + гол утаснаас ирсэн мэдээ, шинэ нь эхэндээ */
+function plateNotes(pk,exceptId){
+  var seen={},out=[];
+  db.records.forEach(function(r){
+    if(plateKey(r.plate)!==pk||r.id===exceptId) return; seen[r.id]=1;
+    if(r.del||db.dupIds[r.id]||!r.note) return;
+    out.push({id:r.id,n:r.note,d:r.date,t:r.time||'',s:r.service||'',w:r.worker||''});
+  });
+  (db.extNotes[pk]||[]).forEach(function(x){
+    if(!x||seen[x.i]||x.i===exceptId||db.dupIds[x.i]||!x.n) return; seen[x.i]=1;
+    out.push({id:x.i,n:x.n,d:x.d||'',t:x.t||'',s:x.s||'',w:x.w||''});
+  });
+  return out.sort(function(a,b){return (b.d+b.t).localeCompare(a.d+a.t);});
+}
+var notesOpen=false, notesFor=null;
+function drawNotes(pk){
+  var box=$('pNotes');
+  if(pk!==notesFor){ notesOpen=false; notesFor=pk; }
+  var list=pk?plateNotes(pk,editId):[];
+  if(!list.length){box.className='notes';box.innerHTML='';return;}
+  var show=notesOpen?list.slice(0,10):list.slice(0,1);
+  box.className='notes on';
+  box.innerHTML='<div class="nt">Өмнөх тэмдэглэл</div>'+show.map(function(x){
+    return '<div class="ni">'+esc(x.n)+'<small>'+esc(x.d)+(x.s?' · '+esc(x.s):'')+(x.w?' · '+esc(x.w):'')+'</small></div>';
+  }).join('')+(list.length>1?'<button type="button" id="notesMore">'+(notesOpen?'Хураах':'Бүх тэмдэглэл ('+list.length+')')+'</button>':'');
+}
+$('pNotes').addEventListener('click',function(e){
+  if(e.target.id!=='notesMore') return;
+  notesOpen=!notesOpen; drawNotes(plateKey($('plate').value));
+});
 function loyalty(pk,exceptId){
   var v=visits(pk).filter(function(x){return x.id!==exceptId;}), n=0;
   v.forEach(function(x){ n = x.free ? 0 : n+1; });
@@ -429,7 +472,7 @@ function resetForm(){
   $('plate').value=''; $('price').value=''; $('note').value='';
   $('date').value=dstr(now); $('time').value=tstr(now);
   sel.svc=null; sel.pay=PAYS[0]; sel.free=false; /* ажилтныг хэвээр үлдээнэ */
-  $('plateHint').innerHTML=''; drawPromo(null);
+  $('plateHint').innerHTML=''; notesOpen=false; drawNotes(null); drawPromo(null);
   $('saveBtn').textContent='Хадгалах';
   $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
   drawChips();
@@ -449,7 +492,8 @@ $('payChips').addEventListener('click',function(e){
 });
 function drawPlateInfo(){
   var k=plateKey($('plate').value), h=$('plateHint');
-  if(k.length<4){h.innerHTML='';drawPromo(null);return;}
+  if(k.length<4){h.innerHTML='';notesOpen=false;drawNotes(null);drawPromo(null);return;}
+  drawNotes(k);
   var L=loyalty(k,editId);
   if(!L.total){h.innerHTML='Шинэ үйлчлүүлэгч';}
   else{
@@ -790,6 +834,7 @@ function mergeFile(d,res,had,setOK){
   }
   if(isSet){
     if(Array.isArray(d.cust)){ db.ext=d.cust.filter(function(e){return e&&e.i&&e.p;}); db.extAt=d.at||null; res.cust=true; }
+    if(d.notes&&typeof d.notes==='object'&&!Array.isArray(d.notes)) db.extNotes=d.notes;
     if(Array.isArray(d.dup)) d.dup.forEach(function(id){ db.dupIds[id]=1; });
   }
   var takeSet=isSet?!!setOK:(d.kind!=='send'&&!had);
@@ -805,7 +850,7 @@ function mergeFile(d,res,had,setOK){
     if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
     if(d.loyN>=2) db.loyN=Math.round(d.loyN);
     if(d.kind==='backup'){
-      ['pct','freePct','ext','extAt','recv','dupIds'].forEach(function(k){ if(k in d) db[k]=d[k]; });
+      ['pct','freePct','ext','extNotes','extAt','recv','dupIds'].forEach(function(k){ if(k in d) db[k]=d[k]; });
       normalize(db);
     }
     if(!isSet&&!db.device&&typeof d.device==='string') db.device=d.device;
@@ -873,11 +918,22 @@ function custSummary(){
   });
   return out;
 }
+/* Машин бүрийн сүүлийн 5 тэмдэглэл (ажилтны утсанд харуулахын тулд) */
+function notesSummary(){
+  var cut=dstr(addDays(new Date(),-400)), by={}, out={};
+  db.records.forEach(function(r){ if(r.note&&!r.del&&r.date>=cut) by[plateKey(r.plate)]=1; });
+  Object.keys(db.extNotes).forEach(function(pk){ by[pk]=1; });
+  Object.keys(by).forEach(function(pk){
+    var l=plateNotes(pk,null).filter(function(x){return x.d>=cut;}).slice(0,5);
+    if(l.length) out[pk]=l.map(function(x){return {i:x.id,n:x.n,d:x.d,t:x.t,s:x.s,w:x.w};});
+  });
+  return out;
+}
 $('sendSet').addEventListener('click',function(){
   var now=new Date();
   download('ugaalga-tohirgoo-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',
     JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,
-      loyOn:db.loyOn,loyN:db.loyN,cust:custSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
+      loyOn:db.loyOn,loyN:db.loyN,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
 $('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
 $('wipe').addEventListener('click',function(){
@@ -963,7 +1019,7 @@ resetForm(); refreshAll(); applyRole();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-17b';
+  var APP_VER='2026-10-27';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
