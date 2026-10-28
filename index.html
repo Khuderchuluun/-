@@ -57,6 +57,18 @@ label:first-child{margin-top:0}
 input,select,textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);
   border:1px solid var(--line);border-radius:10px;padding:12px;min-height:48px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
+/* iPhone дээр огноо, цагийн нүд баганаасаа халихгүй байх */
+input[type="date"],input[type="time"]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left}
+input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date-and-time-value{text-align:left;margin:0}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.seg button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;border:0;border-left:1px solid var(--line);
+  background:transparent;color:var(--muted);min-height:56px;padding:7px 2px;font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button svg{width:22px;height:22px;flex:none}
+.seg button span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg button.on{background:var(--brand);color:var(--brand-ink)}
+.seg button.on + button{border-left-color:var(--brand)}
+.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-3px}
 #plate{font-size:22px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;
@@ -236,7 +248,7 @@ body.worker .rec{cursor:default}
     <div id="wrkChips"></div>
 
     <label>Төлбөрийн хэлбэр</label>
-    <div class="chips" id="payChips"></div>
+    <div class="seg" id="payChips" role="radiogroup" aria-label="Төлбөрийн хэлбэр"></div>
     <div class="split" id="splitBox" hidden>
       <div class="sr"><span>Бэлэн</span><input id="spl0" type="number" inputmode="numeric" min="0" step="500" placeholder="0"><button type="button" data-fill="0">Үлдэгдэл</button></div>
       <div class="sr"><span>Карт</span><input id="spl1" type="number" inputmode="numeric" min="0" step="500" placeholder="0"><button type="button" data-fill="1">Үлдэгдэл</button></div>
@@ -648,8 +660,18 @@ function drawChips(){
           '<span class="ck">✓</span><b>'+esc(w)+'</b></button>';
       }).join('')+'</div>':'')+'</div>';
   }
+  var PICO={
+    'Бэлэн':'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
+    'Карт':'<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19M6.5 15h4"/>',
+    'Шилжүүлэг':'<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>'
+  };
+  PICO[SPLIT]='<circle cx="12" cy="6" r="1.6"/><path d="M5 12h14"/><circle cx="12" cy="18" r="1.6"/>';
+  var PLBL={}; PLBL[SPLIT]='Хуваах';
   $('payChips').innerHTML=PAYS.concat([SPLIT]).map(function(p,i){
-    return '<button type="button" class="chip'+(sel.pay===p?' on':'')+'" data-pay="'+i+'">'+(p===SPLIT?'Хувааж төлөх':esc(p))+'</button>';}).join('');
+    var on=sel.pay===p, full=p===SPLIT?'Хувааж төлөх':p;
+    return '<button type="button" role="radio" aria-checked="'+on+'" aria-label="'+esc(full)+'" title="'+esc(full)+'" class="'+(on?'on':'')+'" data-pay="'+i+'">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+PICO[p]+'</svg>'+
+      '<span>'+esc(PLBL[p]||p)+'</span></button>';}).join('');
   drawSplit();
 }
 function resetForm(){
@@ -1440,7 +1462,7 @@ resetForm(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29e';
+  var APP_VER='2026-10-29f';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
