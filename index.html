@@ -154,15 +154,9 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .wmenu.w2 button .ck{grid-row:auto;font-size:13px}
 .xtra{margin-top:var(--s2)}
 .xtra .chk{margin:0}
-.xlist{margin-top:var(--s2);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
-.xlist label{display:flex;align-items:center;gap:var(--s2);margin:0;padding:var(--s3);border-top:1px solid var(--line);
-  font-size:15px;font-weight:400;color:var(--text);cursor:pointer;min-height:44px}
-.xlist label:first-child{border-top:0}
-.xlist label input{width:20px;height:20px;min-height:0;flex:none;margin:0;padding:0}
-.xlist label span{flex:1;min-width:0}
-.xlist label b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.xlist label.on{background:var(--soft)}
-.xlist .hint{margin:0;padding:var(--s3)}
+.xgrid{margin-top:var(--s2)}
+.xgrid .wbtn .nm small{color:var(--muted)}
+.wmenu button.none b{font-weight:400;color:var(--muted)}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s3)}
 .sgrp .gl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin:0 0 var(--s2)}
 .sgrp .sghead input{font-weight:700}
@@ -267,7 +261,7 @@ body.worker .rec{cursor:default}
     <div id="svcChips"></div>
     <div class="xtra">
       <label class="chk"><input type="checkbox" id="xOn"> Нэмэлт үйлчилгээ</label>
-      <div class="xlist" id="xList" hidden></div>
+      <div class="xgrid" id="xList" hidden></div>
     </div>
 
     <label for="price">Үнэ (₮)</label>
@@ -379,9 +373,10 @@ body.worker .rec{cursor:default}
   </div>
   <div class="card adm">
     <h2>Нэмэлт үйлчилгээ</h2>
-    <div class="hint" style="margin:0 0 8px">Бүртгэхдээ "Нэмэлт үйлчилгээ"-г чагталбал эдгээр гарч ирнэ. Сонгосон нэмэлтийн үнэ угаалгын үнэ дээр нэмэгдэнэ.</div>
+    <div class="hint" style="margin:0 0 8px">Бүртгэхдээ "Нэмэлт үйлчилгээ"-г чагталбал эдгээр гарч ирнэ. Бүлэг дотор олон дэд төрөл үүсгэж болно (жишээ нь Тааз: жижиг, том). Сонгосон нэмэлтийн үнэ угаалгын үнэ дээр нэмэгдэнэ.</div>
     <div id="xSet"></div>
-    <button class="btn ghost" id="addX">+ Нэмэлт нэмэх</button>
+    <button class="btn ghost" id="addXGrp">+ Нэмэлтийн бүлэг нэмэх</button>
+    <button class="btn ghost" id="addX">+ Бүлэггүй нэмэлт нэмэх</button>
   </div>
   <div class="card adm">
     <h2>Ажилтнууд ба цалингийн хувь</h2>
@@ -491,7 +486,7 @@ function defaults(){
     recv:{},         /* утас бүрээс хүлээн авсан мэдээ */
     dupIds:{},       /* өөр утсанд давхар бүртгэгдсэн тул алгассан бүртгэлүүд */
     lastSent:null,
-    extras:[{id:'x1',name:'Тааз',price:10000},{id:'x2',name:'Мотор бодисоор угаах',price:15000}]
+    extras:[{id:'x1',name:'Тааз',price:10000,g:''},{id:'x2',name:'Мотор бодисоор угаах',price:15000,g:''}]
   };
 }
 var DEF_PCT=30;
@@ -521,6 +516,7 @@ function normalize(d){
   if(!('extAt' in d)) d.extAt=null;
   if(!('lastSent' in d)) d.lastSent=null;
   if(!Array.isArray(d.extras)) d.extras=b.extras;
+  d.extras.forEach(function(x){ if(x&&typeof x.g!=='string') x.g=''; });
   return d;
 }
 function save(){
@@ -734,13 +730,16 @@ $('svcChips').addEventListener('click',function(e){
   var g=e.target.closest('[data-gbtn]');
   if(g){
     var gname=svcGroups()[+g.getAttribute('data-gbtn')];
-    openGrp=(openGrp===gname?null:gname); wrkOpen=false; drawChips();
+    openGrp=(openGrp===gname?null:gname); wrkOpen=false; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips();
   }
 });
 function pickSvc(s){ sel.svcId=s.id; sel.svc=svcLabel(s); recalcPrice(); }
 /* ---------- нэмэлт үйлчилгээ ---------- */
 function xSum(list){ return (list||[]).reduce(function(a,x){return a+(+x.p||0);},0); }
-function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:x.name,p:+x.price||0};}); }
+function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:svcLabel(x),p:+x.price||0,g:x.g||''};}); }
+function xById(id){ return db.extras.filter(function(x){return x.id===id;})[0]||null; }
+function xGroups(){ var o=[],m={}; db.extras.forEach(function(x){ if(x.g&&!m[x.g]){m[x.g]=1;o.push(x.g);} }); return o; }
+var openXGrp=null;
 function basePrice(){ var c=sel.svcId?svcById(sel.svcId):null; return c?(+c.price||0):(sel.base||0); }
 /* Үнэ = (үнэгүй бол 0, үгүй бол үндсэн үнэ) + сонгосон нэмэлтүүд */
 function recalcPrice(){
@@ -753,37 +752,75 @@ function recalcPrice(){
 }
 function drawExtras(){
   $('xOn').checked=sel.xOn;
-  var box=$('xList'); box.hidden=!sel.xOn; if(!sel.xOn){ box.innerHTML=''; return; }
+  var box=$('xList'); box.hidden=!sel.xOn; if(!sel.xOn){ box.innerHTML=''; openXGrp=null; return; }
   if(!db.extras.length){ box.innerHTML='<div class="hint">Тохиргооноос нэмэлт үйлчилгээ нэмнэ үү.</div>'; return; }
-  box.innerHTML=db.extras.map(function(x){
-    var on=sel.xs.indexOf(x.id)>=0;
-    return '<label class="'+(on?'on':'')+'"><input type="checkbox" data-x="'+esc(x.id)+'"'+(on?' checked':'')+'><span>'+esc(x.name)+'</span><b>+'+money(x.price)+'</b></label>';
-  }).join('');
+  var seen={}, top=[], gi=xGroups();
+  db.extras.forEach(function(x){ if(x.g){ if(!seen[x.g]){ seen[x.g]=1; top.push({g:x.g}); } } else top.push({x:x}); });
+  if(openXGrp&&!seen[openXGrp]) openXGrp=null;
+  var cells=top.map(function(t,ci){
+    var side=ci%2?' r':'';
+    var tog=function(x,title){ var on=sel.xs.indexOf(x.id)>=0;
+      return '<button type="button" class="wbtn'+(on?' on':'')+'" data-xsvc="'+esc(x.id)+'" aria-pressed="'+on+'"><span class="nm">'+esc(title)+'<small>+'+money(x.price)+'</small></span>'+(on?'<span class="car">✓</span>':'')+'</button>'; };
+    if(t.x) return tog(t.x,t.x.name);
+    var items=db.extras.filter(function(x){return x.g===t.g;});
+    if(items.length===1) return tog(items[0],t.g);
+    var ps=items.map(function(x){return +x.price||0;}), lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps);
+    var cur=items.filter(function(x){return sel.xs.indexOf(x.id)>=0;})[0], op=openXGrp===t.g;
+    var sub=cur?esc(cur.name)+' · +'+money(cur.price):(lo===hi?'+'+money(lo):'+'+money(lo)+' – '+money(hi));
+    return '<div class="wdd'+side+'"><button type="button" class="wbtn'+(cur?' on':'')+'" data-xgbtn="'+gi.indexOf(t.g)+'" aria-haspopup="listbox" aria-expanded="'+op+'">'+
+      '<span class="nm">'+esc(t.g)+'<small>'+sub+'</small></span><span class="car">▼</span></button>'+
+      (op?'<div class="wmenu" role="listbox" aria-label="'+esc(t.g)+'">'+
+        (cur?'<button type="button" role="option" class="none" data-xnone="'+gi.indexOf(t.g)+'"><span class="ck">✓</span><b>Сонгохгүй</b></button>':'')+
+        items.map(function(x){ var on=sel.xs.indexOf(x.id)>=0;
+          return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-xsvc="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b><span class="pr">+'+money(x.price)+'</span></button>';
+        }).join('')+'</div>':'')+'</div>';
+  });
+  box.innerHTML='<div class="sgrid">'+cells.join('')+'</div>';
 }
 $('xOn').addEventListener('change',function(){
   sel.xOn=this.checked; if(!sel.xOn){ sel.xs=[]; } sel.xOld=null;
   drawExtras(); recalcPrice();
 });
-$('xList').addEventListener('change',function(e){
-  var id=e.target.getAttribute&&e.target.getAttribute('data-x'); if(!id) return;
-  var i=sel.xs.indexOf(id);
-  if(e.target.checked&&i<0) sel.xs.push(id); else if(!e.target.checked&&i>=0) sel.xs.splice(i,1);
-  sel.xOld=null; drawExtras(); recalcPrice();
+$('xList').addEventListener('click',function(e){
+  if(e.stopPropagation) e.stopPropagation(); /* дахин зурсны дараа document-ийн сонсогч цэсийг хаахгүй байх */
+  var b=e.target.closest('[data-xsvc]');
+  if(b){
+    var x=xById(b.getAttribute('data-xsvc')); if(!x) return;
+    var i=sel.xs.indexOf(x.id);
+    if(i>=0) sel.xs.splice(i,1);
+    else{
+      /* Нэг бүлгээс нэгийг л сонгоно */
+      if(x.g) sel.xs=sel.xs.filter(function(id){ var y=xById(id); return !(y&&y.g===x.g); });
+      sel.xs.push(x.id);
+    }
+    openXGrp=null; sel.xOld=null; drawExtras(); recalcPrice(); return;
+  }
+  var n=e.target.closest('[data-xnone]');
+  if(n){
+    var gname=xGroups()[+n.getAttribute('data-xnone')];
+    sel.xs=sel.xs.filter(function(id){ var y=xById(id); return !(y&&y.g===gname); });
+    openXGrp=null; sel.xOld=null; drawExtras(); recalcPrice(); return;
+  }
+  var g=e.target.closest('[data-xgbtn]');
+  if(g){
+    var gn=xGroups()[+g.getAttribute('data-xgbtn')];
+    openXGrp=(openXGrp===gn?null:gn); openGrp=null; wrkOpen=false; drawChips(); drawExtras();
+  }
 });
 $('wrkChips').addEventListener('click',function(e){
   if(e.stopPropagation) e.stopPropagation(); /* дахин зурсны дараа document-ийн сонсогч цэсийг хаахгүй байх */
   var b=e.target.closest('[data-wrk]');
   if(b){ sel.wrk=db.workers[+b.getAttribute('data-wrk')]; wrkOpen=false; drawChips(); try{$('wrkBtn').focus();}catch(x){} return; }
-  if(e.target.closest('#wrkBtn')){ wrkOpen=!wrkOpen; openGrp=null; drawChips(); }
+  if(e.target.closest('#wrkBtn')){ wrkOpen=!wrkOpen; openGrp=null; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips(); }
 });
 /* Цэсний гадна дарах эсвэл Esc дарахад хаагдана */
 document.addEventListener('click',function(e){
-  if(!wrkOpen&&!openGrp) return;
+  if(!wrkOpen&&!openGrp&&!openXGrp) return;
   var t=e.target;
-  if(t&&t.closest&&(t.closest('#wrkChips')||t.closest('#svcChips'))) return;
-  wrkOpen=false; openGrp=null; drawChips();
+  if(t&&t.closest&&(t.closest('#wrkChips')||t.closest('#svcChips')||t.closest('#xList'))) return;
+  wrkOpen=false; openGrp=null; openXGrp=null; drawChips(); drawExtras();
 });
-document.addEventListener('keydown',function(e){ if((wrkOpen||openGrp)&&e.key==='Escape'){ wrkOpen=false; openGrp=null; drawChips(); } });
+document.addEventListener('keydown',function(e){ if((wrkOpen||openGrp||openXGrp)&&e.key==='Escape'){ wrkOpen=false; openGrp=null; openXGrp=null; drawChips(); drawExtras(); } });
 $('payChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-pay]'); if(!b) return;
   var np=PAYS.concat([SPLIT])[+b.getAttribute('data-pay')];
@@ -908,7 +945,7 @@ function startEdit(id){
   sel.xs=[]; sel.xOld=null; sel.base=0;
   if(Array.isArray(r.extras)&&r.extras.length){
     sel.xOn=true;
-    r.extras.forEach(function(x){ var m=db.extras.filter(function(e){return e.id===x.id||e.name===x.n;})[0]; if(m) sel.xs.push(m.id); });
+    r.extras.forEach(function(x){ var m=db.extras.filter(function(e){return e.id===x.id;})[0]||db.extras.filter(function(e){return svcLabel(e)===x.n||e.name===x.n;})[0]; if(m) sel.xs.push(m.id); });
     /* Хуучин бүртгэлийн үнийг хадгалахын тулд тухайн үеийн нэмэлтийн үнийг ашиглана */
     if(sel.xs.length!==r.extras.length) sel.xOld=r.extras.slice();
     sel.base=+r.base||0;
@@ -1034,11 +1071,17 @@ $('period').addEventListener('change',drawReport);
 
 /* ---------- settings ---------- */
 function drawXSet(){
-  $('xSet').innerHTML=db.extras.map(function(x,i){
-    return '<div class="setrow"><input data-xn="'+i+'" value="'+esc(x.name)+'" placeholder="Нэр" aria-label="Нэмэлтийн нэр">'+
+  var row=function(x){ var i=db.extras.indexOf(x);
+    return '<div class="setrow'+(x.g?' sitem':'')+'"><input data-xn="'+i+'" value="'+esc(x.name)+'" placeholder="Нэр" aria-label="Нэмэлтийн нэр">'+
       '<input class="pr" data-xp="'+i+'" type="number" inputmode="numeric" value="'+esc(x.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
-      '<button class="x" data-xx="'+i+'" aria-label="Устгах">×</button></div>';
-  }).join('')||'<div class="hint" style="margin:0 0 8px">Нэмэлт үйлчилгээ алга.</div>';
+      '<button class="x" data-xx="'+i+'" aria-label="Устгах">×</button></div>'; };
+  var gs=xGroups(), loose=db.extras.filter(function(x){return !x.g;});
+  $('xSet').innerHTML=gs.map(function(g,gi){
+    return '<div class="sgrp"><div class="gl">Бүлэг</div><div class="setrow sghead"><input data-xgn="'+gi+'" value="'+esc(g)+'" placeholder="Бүлгийн нэр" aria-label="Бүлгийн нэр">'+
+      '<button class="x" data-xgx="'+gi+'" aria-label="Бүлгийг устгах">×</button></div>'+db.extras.filter(function(x){return x.g===g;}).map(row).join('')+
+      '<button class="btn ghost sm" data-xga="'+gi+'">+ '+esc(g)+' бүлэгт нэмэх</button></div>';
+  }).join('')+(loose.length?(gs.length?'<div class="gl" style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--muted)">БҮЛЭГГҮЙ НЭМЭЛТ</div>':'')+loose.map(row).join(''):'')
+  ||'<div class="hint" style="margin:0 0 8px">Нэмэлт үйлчилгээ алга.</div>';
 }
 function drawSettings(){
   drawXSet();
@@ -1147,11 +1190,33 @@ $('wrkSet').addEventListener('click',function(e){
 });
 $('xSet').addEventListener('change',function(e){
   var t=e.target;
+  if(t.hasAttribute('data-xgn')){
+    var old=xGroups()[+t.getAttribute('data-xgn')], nw=t.value.trim()||'Нэргүй бүлэг';
+    db.extras.forEach(function(x){ if(x.g===old) x.g=nw; }); if(openXGrp===old) openXGrp=nw;
+    save(); drawXSet(); drawExtras(); return;
+  }
   if(t.hasAttribute('data-xn')) db.extras[+t.getAttribute('data-xn')].name=t.value.trim()||'Нэргүй';
   if(t.hasAttribute('data-xp')) db.extras[+t.getAttribute('data-xp')].price=parseFloat(t.value)||0;
   save(); drawExtras();
 });
 $('xSet').addEventListener('click',function(e){
+  var ga=e.target.closest('[data-xga]');
+  if(ga){
+    var g=xGroups()[+ga.getAttribute('data-xga')], last=-1;
+    db.extras.forEach(function(x,i){ if(x.g===g) last=i; });
+    db.extras.splice(last+1,0,{id:uid(),name:'Шинэ төрөл',price:0,g:g}); save(); drawXSet(); drawExtras(); return;
+  }
+  var gx=e.target.closest('[data-xgx]');
+  if(gx){
+    var gname=xGroups()[+gx.getAttribute('data-xgx')], cnt=db.extras.filter(function(x){return x.g===gname;}).length;
+    ask('"'+gname+'" бүлэг болон доторх '+cnt+' нэмэлтийг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
+      if(!ok) return;
+      var ids=db.extras.filter(function(x){return x.g===gname;}).map(function(x){return x.id;});
+      db.extras=db.extras.filter(function(x){return x.g!==gname;});
+      sel.xs=sel.xs.filter(function(id){return ids.indexOf(id)<0;});
+      save(); drawXSet(); drawExtras(); recalcPrice(); });
+    return;
+  }
   var b=e.target.closest('[data-xx]'); if(!b) return;
   var i=+b.getAttribute('data-xx');
   ask('"'+db.extras[i].name+'" нэмэлтийг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
@@ -1160,8 +1225,14 @@ $('xSet').addEventListener('click',function(e){
     save(); drawXSet(); drawExtras(); recalcPrice(); });
 });
 $('addX').addEventListener('click',function(){
-  db.extras.push({id:uid(),name:'Шинэ нэмэлт',price:0}); save(); drawXSet(); drawExtras();
+  db.extras.push({id:uid(),name:'Шинэ нэмэлт',price:0,g:''}); save(); drawXSet(); drawExtras();
   try{ var ins=document.querySelectorAll('#xSet [data-xn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
+});
+$('addXGrp').addEventListener('click',function(){
+  var gs=xGroups(), n=gs.length+1, name='Шинэ бүлэг '+n;
+  while(gs.indexOf(name)>=0){ n++; name='Шинэ бүлэг '+n; }
+  db.extras.push({id:uid(),name:'Шинэ төрөл',price:0,g:name}); save(); drawXSet(); drawExtras();
+  try{ var ins=document.querySelectorAll('#xSet [data-xgn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
 });
 $('addWrk').addEventListener('click',function(){
   db.workers.push('Ажилтан '+(db.workers.length+1)); save(); drawSettings(); drawChips();
@@ -1267,7 +1338,7 @@ function mergeFile(d,res,had,setOK){
       db.workers=d.workers.filter(function(x){return typeof x==='string'&&x;}); res.set=true;
     }
     if(Array.isArray(d.extras)){
-      db.extras=d.extras.filter(function(x){return x&&x.name;}).map(function(x){return {id:String(x.id||uid()),name:String(x.name),price:parseFloat(x.price)||0};});
+      db.extras=d.extras.filter(function(x){return x&&x.name;}).map(function(x){return {id:String(x.id||uid()),name:String(x.name),price:parseFloat(x.price)||0,g:typeof x.g==='string'?x.g:''};});
       res.set=true;
     }
     if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
@@ -1467,7 +1538,7 @@ function knownDevices(){
 function inviteUrl(){
   var inv={v:1,m:db.device,p:db.pin,
     s:db.services.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
-    w:db.workers,x:db.extras.map(function(x){return [x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
+    w:db.workers,x:db.extras.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
   return location.origin+location.pathname+'#join='+b64e(JSON.stringify(inv));
 }
 function parseInvite(str){
@@ -1484,7 +1555,7 @@ function applyInvite(d){
   db.services=d.s.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){
     return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
   db.workers=d.w.filter(function(x){return typeof x==='string'&&x;});
-  if(Array.isArray(d.x)) db.extras=d.x.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0};});
+  if(Array.isArray(d.x)) db.extras=d.x.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
   if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
   if(d.ln>=2) db.loyN=Math.round(d.ln);
   if(typeof d.p==='string') db.pin=d.p;
