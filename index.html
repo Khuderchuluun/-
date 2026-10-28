@@ -157,6 +157,18 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .xgrid{margin-top:var(--s2)}
 .xgrid .wbtn .nm small{color:var(--muted)}
 .wmenu button.none b{font-weight:400;color:var(--muted)}
+.acc-card{padding:0}
+.acc summary{list-style:none;display:flex;align-items:center;gap:var(--s2);padding:var(--s4);cursor:pointer;min-height:52px;
+  -webkit-tap-highlight-color:transparent;border-radius:14px}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.acc .at{flex:1;min-width:0;font-size:15px;font-weight:700}
+.acc .as{flex:none;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.acc .car{flex:none;font-size:12px;color:var(--muted);transition:transform .15s}
+.acc[open] .car{transform:rotate(180deg)}
+.acc[open] summary{padding-bottom:var(--s3)}
+.acc-body{padding:0 var(--s4) var(--s4)}
+@media (prefers-reduced-motion:reduce){.acc .car{transition:none}}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s3)}
 .sgrp .gl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin:0 0 var(--s2)}
 .sgrp .sghead input{font-weight:700}
@@ -363,27 +375,39 @@ body.worker .rec{cursor:default}
     </div>
     <div class="hint" id="loyHint"></div>
   </div>
-  <div class="card adm">
-    <h2>Угаалгын төрөл ба үнэ</h2>
+  <div class="card adm acc-card">
+    <details class="acc" id="accSvc">
+      <summary><span class="at">Угаалгын төрөл ба үнэ</span><span class="as" id="accSvcSum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
     <div class="hint" style="margin:0 0 8px">Бүлэг дотор олон дэд төрөл үүсгэж болно. Жишээ нь "Бүтэн" бүлэгт 55,000, 60,000, 70,000₮-ийн төрлүүд.</div>
     <div id="svcSet"></div>
     <button class="btn ghost" id="addGrp">+ Бүлэг нэмэх</button>
     <button class="btn ghost" id="addSvc">+ Бүлэггүй төрөл нэмэх</button>
     <button class="btn ghost" id="autoGrp" hidden>Нэрээр нь автоматаар бүлэглэх</button>
+      </div>
+    </details>
   </div>
-  <div class="card adm">
-    <h2>Нэмэлт үйлчилгээ</h2>
+  <div class="card adm acc-card">
+    <details class="acc" id="accX">
+      <summary><span class="at">Нэмэлт үйлчилгээ</span><span class="as" id="accXSum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
     <div class="hint" style="margin:0 0 8px">Бүртгэхдээ "Нэмэлт үйлчилгээ"-г чагталбал эдгээр гарч ирнэ. Бүлэг дотор олон дэд төрөл үүсгэж болно (жишээ нь Тааз: жижиг, том). Сонгосон нэмэлтийн үнэ угаалгын үнэ дээр нэмэгдэнэ.</div>
     <div id="xSet"></div>
     <button class="btn ghost" id="addXGrp">+ Нэмэлтийн бүлэг нэмэх</button>
     <button class="btn ghost" id="addX">+ Бүлэггүй нэмэлт нэмэх</button>
+      </div>
+    </details>
   </div>
-  <div class="card adm">
-    <h2>Ажилтнууд ба цалингийн хувь</h2>
+  <div class="card adm acc-card">
+    <details class="acc" id="accWrk">
+      <summary><span class="at">Ажилтнууд ба цалингийн хувь</span><span class="as" id="accWrkSum"></span><span class="car" aria-hidden="true">▼</span></summary>
+      <div class="acc-body">
     <div class="hint" style="margin:0 0 8px">Ажилтан угаасан машины үнийн хэдэн хувийг авах вэ.</div>
     <div id="wrkSet"></div>
     <button class="btn ghost" id="addWrk">+ Ажилтан нэмэх</button>
     <label class="chk"><input type="checkbox" id="freePct"> Үнэгүй угаалгад ч жинхэнэ үнээр нь хувь бодох</label>
+      </div>
+    </details>
   </div>
   <div class="card adm">
     <h2>Өгөгдөл хадгалах, сэргээх</h2>
@@ -1082,9 +1106,17 @@ function drawXSet(){
       '<button class="btn ghost sm" data-xga="'+gi+'">+ '+esc(g)+' бүлэгт нэмэх</button></div>';
   }).join('')+(loose.length?(gs.length?'<div class="gl" style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--muted)">БҮЛЭГГҮЙ НЭМЭЛТ</div>':'')+loose.map(row).join(''):'')
   ||'<div class="hint" style="margin:0 0 8px">Нэмэлт үйлчилгээ алга.</div>';
+  if($('accXSum')) drawAccSums();
+}
+function drawAccSums(){
+  var gs=svcGroups().length, n=db.services.length;
+  $('accSvcSum').textContent=(gs?gs+' бүлэг · ':'')+n+' төрөл';
+  var xg=xGroups().length, xn=db.extras.length;
+  $('accXSum').textContent=xn?(xg?xg+' бүлэг · ':'')+xn+' нэмэлт':'Алга';
+  $('accWrkSum').textContent=db.workers.length+' ажилтан';
 }
 function drawSettings(){
-  drawXSet();
+  drawXSet(); drawAccSums();
   var row=function(s){ var i=db.services.indexOf(s);
     return '<div class="setrow sitem"><input data-sn="'+i+'" value="'+esc(s.name)+'" placeholder="Нэр" aria-label="Төрлийн нэр">'+
       '<input class="pr" data-sp="'+i+'" type="number" inputmode="numeric" value="'+esc(s.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
@@ -1651,7 +1683,7 @@ resetForm(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29i';
+  var APP_VER='2026-10-29j';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
