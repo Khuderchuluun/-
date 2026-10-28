@@ -1,4 +1,4 @@
-var C='ugaalga-v15';
+var C='ugaalga-v16';
 var FILES=['./','index.html','manifest.webmanifest','icon-180.png','icon-512.png'];
 
 /* Суулгахдаа хөтчийн кэшийг алгасаж, сервер дээрх хамгийн шинэ файлуудыг татна */

@@ -152,6 +152,17 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .wmenu.w2 button:nth-child(even){border-left:1px solid var(--line)}
 .wmenu.w2 button b{font-size:13px;overflow-wrap:anywhere}
 .wmenu.w2 button .ck{grid-row:auto;font-size:13px}
+.xtra{margin-top:var(--s2)}
+.xtra .chk{margin:0}
+.xlist{margin-top:var(--s2);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.xlist label{display:flex;align-items:center;gap:var(--s2);margin:0;padding:var(--s3);border-top:1px solid var(--line);
+  font-size:15px;font-weight:400;color:var(--text);cursor:pointer;min-height:44px}
+.xlist label:first-child{border-top:0}
+.xlist label input{width:20px;height:20px;min-height:0;flex:none;margin:0;padding:0}
+.xlist label span{flex:1;min-width:0}
+.xlist label b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.xlist label.on{background:var(--soft)}
+.xlist .hint{margin:0;padding:var(--s3)}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s3)}
 .sgrp .gl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin:0 0 var(--s2)}
 .sgrp .sghead input{font-weight:700}
@@ -254,9 +265,14 @@ body.worker .rec{cursor:default}
 
     <label>Угаалгын төрөл</label>
     <div id="svcChips"></div>
+    <div class="xtra">
+      <label class="chk"><input type="checkbox" id="xOn"> Нэмэлт үйлчилгээ</label>
+      <div class="xlist" id="xList" hidden></div>
+    </div>
 
     <label for="price">Үнэ (₮)</label>
     <input id="price" type="number" inputmode="numeric" min="0" step="500" placeholder="0">
+    <div class="hint" id="priceHint" hidden></div>
 
     <label>Угаасан ажилтан</label>
     <div id="wrkChips"></div>
@@ -313,6 +329,7 @@ body.worker .rec{cursor:default}
   <div class="card"><h2>Төлбөрийн хэлбэрээр</h2><div id="byPay"></div></div>
   <div class="card" id="byGrpCard" hidden><h2>Бүлгээр</h2><div id="byGrp"></div></div>
   <div class="card"><h2>Угаалгын төрлөөр</h2><div id="bySvc"></div></div>
+  <div class="card" id="byXCard" hidden><h2>Нэмэлт үйлчилгээгээр</h2><div id="byX"></div></div>
   <div class="card"><h2>Ажилтны цалин</h2><div id="pay2Wrk"></div></div>
   <div class="card"><h2>Ажилтнаар</h2><div id="byWrk"></div></div>
   <div class="card"><h2>Байнгын үйлчлүүлэгчид</h2><div id="topCust"></div></div>
@@ -359,6 +376,12 @@ body.worker .rec{cursor:default}
     <button class="btn ghost" id="addGrp">+ Бүлэг нэмэх</button>
     <button class="btn ghost" id="addSvc">+ Бүлэггүй төрөл нэмэх</button>
     <button class="btn ghost" id="autoGrp" hidden>Нэрээр нь автоматаар бүлэглэх</button>
+  </div>
+  <div class="card adm">
+    <h2>Нэмэлт үйлчилгээ</h2>
+    <div class="hint" style="margin:0 0 8px">Бүртгэхдээ "Нэмэлт үйлчилгээ"-г чагталбал эдгээр гарч ирнэ. Сонгосон нэмэлтийн үнэ угаалгын үнэ дээр нэмэгдэнэ.</div>
+    <div id="xSet"></div>
+    <button class="btn ghost" id="addX">+ Нэмэлт нэмэх</button>
   </div>
   <div class="card adm">
     <h2>Ажилтнууд ба цалингийн хувь</h2>
@@ -467,7 +490,8 @@ function defaults(){
     extAt:null,
     recv:{},         /* утас бүрээс хүлээн авсан мэдээ */
     dupIds:{},       /* өөр утсанд давхар бүртгэгдсэн тул алгассан бүртгэлүүд */
-    lastSent:null
+    lastSent:null,
+    extras:[{id:'x1',name:'Тааз',price:10000},{id:'x2',name:'Мотор бодисоор угаах',price:15000}]
   };
 }
 var DEF_PCT=30;
@@ -496,6 +520,7 @@ function normalize(d){
   if(!(d.loyN>=2)) d.loyN=10;
   if(!('extAt' in d)) d.extAt=null;
   if(!('lastSent' in d)) d.lastSent=null;
+  if(!Array.isArray(d.extras)) d.extras=b.extras;
   return d;
 }
 function save(){
@@ -605,7 +630,7 @@ function loyalty(pk,exceptId){
 }
 
 /* ---------- add / edit form ---------- */
-var sel={svc:null,svcId:null,wrk:null,pay:PAYS[0],free:false}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false;
+var sel={svc:null,svcId:null,wrk:null,pay:PAYS[0],free:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false;
 
 /* Бүртгэлийн төлбөрийг хэлбэр бүрээр задлана: {Бэлэн:x, Карт:y, Шилжүүлэг:z} */
 function payParts(r){
@@ -692,7 +717,8 @@ function resetForm(){
   editId=null; var now=new Date();
   $('plate').value=''; $('price').value=''; $('note').value='';
   $('date').value=dstr(now); $('time').value=tstr(now);
-  sel.svc=null; sel.svcId=null; openGrp=null; wrkOpen=false; svcOpen=false; sel.pay=PAYS[0]; sel.free=false; clearSplit(); /* ажилтныг хэвээр үлдээнэ */
+  sel.svc=null; sel.svcId=null; openGrp=null; wrkOpen=false; svcOpen=false; sel.pay=PAYS[0]; sel.free=false; clearSplit();
+  sel.xOn=false; sel.xs=[]; sel.xOld=null; sel.base=0; $('priceHint').hidden=true; drawExtras(); /* ажилтныг хэвээр үлдээнэ */
   $('plateHint').innerHTML=''; notesOpen=false; drawNotes(null); drawPromo(null);
   $('saveBtn').textContent='Хадгалах';
   $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
@@ -711,7 +737,39 @@ $('svcChips').addEventListener('click',function(e){
     openGrp=(openGrp===gname?null:gname); wrkOpen=false; drawChips();
   }
 });
-function pickSvc(s){ sel.svcId=s.id; sel.svc=svcLabel(s); $('price').value=sel.free?0:s.price; drawSplit(); }
+function pickSvc(s){ sel.svcId=s.id; sel.svc=svcLabel(s); recalcPrice(); }
+/* ---------- нэмэлт үйлчилгээ ---------- */
+function xSum(list){ return (list||[]).reduce(function(a,x){return a+(+x.p||0);},0); }
+function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:x.name,p:+x.price||0};}); }
+function basePrice(){ var c=sel.svcId?svcById(sel.svcId):null; return c?(+c.price||0):(sel.base||0); }
+/* Үнэ = (үнэгүй бол 0, үгүй бол үндсэн үнэ) + сонгосон нэмэлтүүд */
+function recalcPrice(){
+  var xs=sel.xOld||xSel(), base=basePrice(), tot=(sel.free?0:base)+xSum(xs);
+  if(sel.svcId||xs.length) $('price').value=tot;
+  var h=$('priceHint');
+  if(xs.length&&(sel.svcId||sel.base)){ h.hidden=false; h.textContent=(sel.free?'Үнэгүй угаалга':'Угаалга '+money(base))+' + нэмэлт '+money(xSum(xs)); }
+  else h.hidden=true;
+  drawSplit();
+}
+function drawExtras(){
+  $('xOn').checked=sel.xOn;
+  var box=$('xList'); box.hidden=!sel.xOn; if(!sel.xOn){ box.innerHTML=''; return; }
+  if(!db.extras.length){ box.innerHTML='<div class="hint">Тохиргооноос нэмэлт үйлчилгээ нэмнэ үү.</div>'; return; }
+  box.innerHTML=db.extras.map(function(x){
+    var on=sel.xs.indexOf(x.id)>=0;
+    return '<label class="'+(on?'on':'')+'"><input type="checkbox" data-x="'+esc(x.id)+'"'+(on?' checked':'')+'><span>'+esc(x.name)+'</span><b>+'+money(x.price)+'</b></label>';
+  }).join('');
+}
+$('xOn').addEventListener('change',function(){
+  sel.xOn=this.checked; if(!sel.xOn){ sel.xs=[]; } sel.xOld=null;
+  drawExtras(); recalcPrice();
+});
+$('xList').addEventListener('change',function(e){
+  var id=e.target.getAttribute&&e.target.getAttribute('data-x'); if(!id) return;
+  var i=sel.xs.indexOf(id);
+  if(e.target.checked&&i<0) sel.xs.push(id); else if(!e.target.checked&&i>=0) sel.xs.splice(i,1);
+  sel.xOld=null; drawExtras(); recalcPrice();
+});
 $('wrkChips').addEventListener('click',function(e){
   if(e.stopPropagation) e.stopPropagation(); /* дахин зурсны дараа document-ийн сонсогч цэсийг хаахгүй байх */
   var b=e.target.closest('[data-wrk]');
@@ -780,8 +838,8 @@ function drawPromo(L){
   box.className='promo'; box.innerHTML='';
 }
 $('promo').addEventListener('click',function(e){
-  if(e.target.id==='promoOn'){ sel.free=true; $('price').value=0; drawPlateInfo(); toast('Үнэгүй угаалга'); }
-  if(e.target.id==='promoOff'){ sel.free=false; $('price').value=sel.svc?svcPrice(sel.svc):''; drawPlateInfo(); }
+  if(e.target.id==='promoOn'){ sel.free=true; recalcPrice(); if(!sel.svcId&&!sel.xs.length) $('price').value=0; drawPlateInfo(); toast('Үнэгүй угаалга'); }
+  if(e.target.id==='promoOff'){ sel.free=false; recalcPrice(); drawPlateInfo(); }
 });
 $('plate').addEventListener('input',drawPlateInfo);
 $('saveBtn').addEventListener('click',function(){
@@ -804,10 +862,12 @@ $('saveBtn').addEventListener('click',function(){
   var now=new Date();
   var old=editId?db.records.filter(function(x){return x.id===editId;})[0]:null;
   var curS=sel.svcId?svcById(sel.svcId):null;
-  var rec={id:editId||uid(),plate:plate,service:sel.svc,group:curS?(curS.g||''):((editId&&db.records.filter(function(x){return x.id===editId;})[0]||{}).group||''),price:sel.free?0:price,worker:sel.wrk||'',
+  var rec={id:editId||uid(),plate:plate,service:sel.svc,group:curS?(curS.g||''):((editId&&db.records.filter(function(x){return x.id===editId;})[0]||{}).group||''),price:sel.free?xSum(sel.xOld||xSel()):price,worker:sel.wrk||'',
     pay:split?SPLIT:payNow,date:$('date').value||dstr(now),time:$('time').value||tstr(now),note:$('note').value.trim(),
     dev:old?(old.dev||''):db.device,upd:Date.now(),sent:false};
   if(split) rec.split=split;
+  var xs=sel.xOld||xSel();
+  if(xs.length){ rec.extras=xs; rec.base=Math.max(0,rec.price-xSum(xs)); }
   if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); }
   if(!editId){
     var pk=plateKey(plate), m=mins(rec.time);
@@ -845,6 +905,15 @@ function startEdit(id){
   $('date').value=r.date; $('time').value=r.time;
   sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.pay=r.pay||PAYS[0]; sel.free=!!r.free;
   clearSplit(); if(r.pay===SPLIT&&r.split) PAYS.forEach(function(p,i){ if(r.split[p]) $('spl'+i).value=r.split[p]; });
+  sel.xs=[]; sel.xOld=null; sel.base=0;
+  if(Array.isArray(r.extras)&&r.extras.length){
+    sel.xOn=true;
+    r.extras.forEach(function(x){ var m=db.extras.filter(function(e){return e.id===x.id||e.name===x.n;})[0]; if(m) sel.xs.push(m.id); });
+    /* Хуучин бүртгэлийн үнийг хадгалахын тулд тухайн үеийн нэмэлтийн үнийг ашиглана */
+    if(sel.xs.length!==r.extras.length) sel.xOld=r.extras.slice();
+    sel.base=+r.base||0;
+  }else sel.xOn=false;
+  drawExtras(); $('priceHint').hidden=true;
   $('saveBtn').textContent='Засварыг хадгалах';
   $('cancelEdit').style.display='block'; $('delBtn').style.display='block';
   drawPlateInfo(); drawChips(); show('add'); window.scrollTo(0,0);
@@ -862,7 +931,7 @@ function drawList(){
   var shown=rows.slice(0,300);
   $('listBox').innerHTML=shown.length?shown.map(function(r){
     return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+(r.free?'<span class="tag">ҮНЭГҮЙ</span>':'')+'</div>'+
-      '<div class="s">'+esc(r.service)+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
+      '<div class="s">'+esc(r.service)+(r.extras&&r.extras.length?' + '+r.extras.map(function(x){return esc(x.n);}).join(', '):'')+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
       '<div class="amt">'+money(r.price)+'<small>'+(q?esc(r.date)+' ':'')+esc(r.time)+' · '+esc(payLabel(r))+'</small></div></div>';
   }).join('')+(rows.length>shown.length?'<div class="empty">Эхний 300-г харууллаа</div>':'')
   :'<div class="empty">Бүртгэл алга</div>';
@@ -922,7 +991,11 @@ function drawReport(){
   });
   pl.sort(function(a,b){return b.sum-a.sum;});
   $('byPay').innerHTML=bars(pl,tot)+(nSplit?'<div class="hint">'+nSplit+' бүртгэлийн төлбөр хуваагдсан тул дүнг хэлбэр бүрт нь хуваарилсан.</div>':'');
-  $('bySvc').innerHTML=bars(by('service'),tot);
+  $('bySvc').innerHTML=bars(group(rows.map(function(r){return {service:r.service,price:(+r.price||0)-xSum(r.extras)};}),'service').sort(function(a,b){return b.sum-a.sum;}),tot);
+  var xm={},xl=[];
+  rows.forEach(function(r){ (r.extras||[]).forEach(function(x){ if(!xm[x.n]){xm[x.n]={k:x.n,n:0,sum:0};xl.push(xm[x.n]);} xm[x.n].n++; xm[x.n].sum+=(+x.p||0); }); });
+  $('byXCard').hidden=!xl.length;
+  if(xl.length) $('byX').innerHTML=bars(xl.sort(function(a,b){return b.sum-a.sum;}),tot);
   var hasG=rows.some(function(r){return r.group;});
   $('byGrpCard').hidden=!hasG;
   if(hasG) $('byGrp').innerHTML=bars(group(rows.map(function(r){return {group:r.group||'Бүлэггүй',price:r.price};}),'group').sort(function(a,b){return b.sum-a.sum;}),tot);
@@ -960,7 +1033,15 @@ function drawTopCust(rows){
 $('period').addEventListener('change',drawReport);
 
 /* ---------- settings ---------- */
+function drawXSet(){
+  $('xSet').innerHTML=db.extras.map(function(x,i){
+    return '<div class="setrow"><input data-xn="'+i+'" value="'+esc(x.name)+'" placeholder="Нэр" aria-label="Нэмэлтийн нэр">'+
+      '<input class="pr" data-xp="'+i+'" type="number" inputmode="numeric" value="'+esc(x.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
+      '<button class="x" data-xx="'+i+'" aria-label="Устгах">×</button></div>';
+  }).join('')||'<div class="hint" style="margin:0 0 8px">Нэмэлт үйлчилгээ алга.</div>';
+}
 function drawSettings(){
+  drawXSet();
   var row=function(s){ var i=db.services.indexOf(s);
     return '<div class="setrow sitem"><input data-sn="'+i+'" value="'+esc(s.name)+'" placeholder="Нэр" aria-label="Төрлийн нэр">'+
       '<input class="pr" data-sp="'+i+'" type="number" inputmode="numeric" value="'+esc(s.price)+'" placeholder="Үнэ" aria-label="Үнэ">'+
@@ -1064,6 +1145,24 @@ $('wrkSet').addEventListener('click',function(e){
   ask('"'+db.workers[i]+'" ажилтныг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
     if(!ok) return; db.workers.splice(i,1); sel.wrk=null; save(); drawSettings(); drawChips(); });
 });
+$('xSet').addEventListener('change',function(e){
+  var t=e.target;
+  if(t.hasAttribute('data-xn')) db.extras[+t.getAttribute('data-xn')].name=t.value.trim()||'Нэргүй';
+  if(t.hasAttribute('data-xp')) db.extras[+t.getAttribute('data-xp')].price=parseFloat(t.value)||0;
+  save(); drawExtras();
+});
+$('xSet').addEventListener('click',function(e){
+  var b=e.target.closest('[data-xx]'); if(!b) return;
+  var i=+b.getAttribute('data-xx');
+  ask('"'+db.extras[i].name+'" нэмэлтийг хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
+    if(!ok) return; var id=db.extras[i].id; db.extras.splice(i,1);
+    var k=sel.xs.indexOf(id); if(k>=0) sel.xs.splice(k,1);
+    save(); drawXSet(); drawExtras(); recalcPrice(); });
+});
+$('addX').addEventListener('click',function(){
+  db.extras.push({id:uid(),name:'Шинэ нэмэлт',price:0}); save(); drawXSet(); drawExtras();
+  try{ var ins=document.querySelectorAll('#xSet [data-xn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
+});
 $('addWrk').addEventListener('click',function(){
   db.workers.push('Ажилтан '+(db.workers.length+1)); save(); drawSettings(); drawChips();
 });
@@ -1100,8 +1199,8 @@ function csvCell(v){v=String(v==null?'':v); return /[",\n;]/.test(v)?'"'+v.repla
 $('expCsv').addEventListener('click',function(){
   if(!live().length){toast('Бүртгэл алга');return;}
   var rows=live().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
-  var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Үнэ','Урамшуулал','Ажилтан','Ажилтны цалин','Төлбөр','Бэлэн','Карт','Шилжүүлэг','Тэмдэглэл','Утас'].join(',')];
-  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,r.price,r.free?'Үнэгүй':'',r.worker,Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
+  var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Нэмэлт','Нэмэлтийн дүн','Үнэ','Урамшуулал','Ажилтан','Ажилтны цалин','Төлбөр','Бэлэн','Карт','Шилжүүлэг','Тэмдэглэл','Утас'].join(',')];
+  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,(r.extras||[]).map(function(x){return x.n;}).join('; '),xSum(r.extras),r.price,r.free?'Үнэгүй':'',r.worker,Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
   download('ugaalga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
 });
 $('expJson').addEventListener('click',function(){
@@ -1166,6 +1265,10 @@ function mergeFile(d,res,had,setOK){
     }
     if(Array.isArray(d.workers)){
       db.workers=d.workers.filter(function(x){return typeof x==='string'&&x;}); res.set=true;
+    }
+    if(Array.isArray(d.extras)){
+      db.extras=d.extras.filter(function(x){return x&&x.name;}).map(function(x){return {id:String(x.id||uid()),name:String(x.name),price:parseFloat(x.price)||0};});
+      res.set=true;
     }
     if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
     if(d.loyN>=2) db.loyN=Math.round(d.loyN);
@@ -1252,7 +1355,7 @@ function notesSummary(){
 $('sendSet').addEventListener('click',function(){
   var now=new Date();
   download('ugaalga-tohirgoo-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',
-    JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,
+    JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,extras:db.extras,
       loyOn:db.loyOn,loyN:db.loyN,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
 $('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
@@ -1364,7 +1467,7 @@ function knownDevices(){
 function inviteUrl(){
   var inv={v:1,m:db.device,p:db.pin,
     s:db.services.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
-    w:db.workers,lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
+    w:db.workers,x:db.extras.map(function(x){return [x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
   return location.origin+location.pathname+'#join='+b64e(JSON.stringify(inv));
 }
 function parseInvite(str){
@@ -1381,6 +1484,7 @@ function applyInvite(d){
   db.services=d.s.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){
     return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
   db.workers=d.w.filter(function(x){return typeof x==='string'&&x;});
+  if(Array.isArray(d.x)) db.extras=d.x.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0};});
   if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
   if(d.ln>=2) db.loyN=Math.round(d.ln);
   if(typeof d.p==='string') db.pin=d.p;
@@ -1476,7 +1580,7 @@ resetForm(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29h';
+  var APP_VER='2026-10-29i';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
