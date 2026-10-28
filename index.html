@@ -119,6 +119,22 @@ h2{font-size:15px;margin:0 0 8px}
 .wmenu button small{grid-column:2;font-size:13px;color:var(--muted);margin-top:2px}
 .wmenu button.on{background:var(--soft)}
 @media (prefers-reduced-motion:reduce){.wbtn .car,.chip .car,.wmenu .gc{transition:none}}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sgrid > *{min-width:0}
+.sgrid .wbtn{min-height:56px;padding:9px 10px;gap:6px}
+.sgrid .wbtn .nm{display:flex;flex-direction:column;white-space:normal}
+.sgrid .wbtn .nm small{font-size:12px;font-weight:400;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sgrid .wbtn.on{border-color:var(--brand);background:var(--soft)}
+.sgrid .wbtn.on .nm small{color:var(--text)}
+.sgrid .wmenu{min-width:min(260px,calc(100vw - 40px))}
+.sgrid .wdd.r .wmenu{left:auto;right:0}
+.wdd.wk .wbtn{font-size:13px;min-height:46px}
+.wmenu.w2{display:grid;grid-template-columns:1fr 1fr}
+.wmenu.w2 button{grid-template-columns:20px 1fr;padding:12px 10px;border-top:1px solid var(--line);min-height:46px}
+.wmenu.w2 button:nth-child(-n+2){border-top:0}
+.wmenu.w2 button:nth-child(even){border-left:1px solid var(--line)}
+.wmenu.w2 button b{font-size:13px;overflow-wrap:anywhere}
+.wmenu.w2 button .ck{grid-row:auto;font-size:13px}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
 .sgrp .gl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin:0 0 4px}
 .sgrp .sghead input{font-weight:700}
@@ -596,42 +612,40 @@ function drawChips(){
     else top.push({s:x});
   });
   if(openGrp&&!seenG[openGrp]) openGrp=null;
-  if(!db.services.length){ svcOpen=false; $('svcChips').innerHTML='<div class="hint">Тохиргооноос төрөл нэмнэ үү.</div>'; }
+  if(!db.services.length){ openGrp=null; $('svcChips').innerHTML='<div class="hint">Тохиргооноос төрөл нэмнэ үү.</div>'; }
   else{
-    var gi=svcGroups(), lbl=cur?svcLabel(cur):(sel.svc||'');
-    var opt=function(x,sub){
-      return '<button type="button" role="option" aria-selected="'+(sel.svcId===x.id)+'" class="'+(sub?'sub':'')+(sel.svcId===x.id?' on':'')+'" data-svc="'+esc(x.id)+'">'+
-        (sub?'':'<span class="ck">✓</span>')+'<b>'+esc(x.name)+'</b><span class="pr">'+money(x.price)+'</span></button>';
-    };
-    var menu='';
-    if(svcOpen){
-      menu='<div class="wmenu" role="listbox" aria-label="Угаалгын төрөл">'+top.map(function(t){
-        if(t.s) return opt(t.s,false);
-        var items=db.services.filter(function(x){return x.g===t.g;}), ps=items.map(function(x){return +x.price||0;});
-        var lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps), picked=cur&&cur.g===t.g, op=openGrp===t.g;
-        var head='<button type="button" class="'+(picked?'on':'')+(op?' gopen':'')+'" data-grp="'+gi.indexOf(t.g)+'" aria-expanded="'+op+'">'+
-          '<span class="ck">✓</span><b>'+esc(t.g)+'</b><span class="gc">▶</span>'+
-          '<small>'+(picked?esc(cur.name)+' · '+money(cur.price):items.length+' төрөл · '+(lo===hi?money(lo):money(lo)+' – '+money(hi)))+'</small></button>';
-        return head+(op?items.map(function(x){return opt(x,true);}).join(''):'');
-      }).join('')+'</div>';
-    }
-    $('svcChips').innerHTML='<div class="wdd"><button type="button" class="wbtn" id="svcBtn" aria-haspopup="listbox" aria-expanded="'+svcOpen+'">'+
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c3.5 4.2 6 7.6 6 10.5A6 6 0 0 1 6 13.5C6 10.6 8.5 7.2 12 3z"/></svg>'+
-      '<span class="nm'+(lbl?'':' ph')+'">'+(lbl?esc(lbl):'Угаалгын төрөл сонгох')+'</span>'+
-      (cur?'<span class="bp">'+money(cur.price)+'</span>':'')+'<span class="car">▼</span></button>'+menu+'</div>';
+    var gi=svcGroups();
+    var cells=top.map(function(t,ci){
+      var side=ci%2?' r':'';
+      if(t.s){
+        var on=sel.svcId===t.s.id;
+        return '<button type="button" class="wbtn'+(on?' on':'')+'" data-svc="'+esc(t.s.id)+'" aria-pressed="'+on+'"><span class="nm">'+esc(t.s.name)+'<small>'+money(t.s.price)+'</small></span></button>';
+      }
+      var items=db.services.filter(function(x){return x.g===t.g;}), ps=items.map(function(x){return +x.price||0;});
+      var lo=Math.min.apply(null,ps), hi=Math.max.apply(null,ps), picked=cur&&cur.g===t.g, op=openGrp===t.g;
+      if(items.length===1){
+        var x1=items[0], on1=sel.svcId===x1.id;
+        return '<button type="button" class="wbtn'+(on1?' on':'')+'" data-svc="'+esc(x1.id)+'" aria-pressed="'+on1+'"><span class="nm">'+esc(t.g)+'<small>'+money(x1.price)+'</small></span></button>';
+      }
+      var sub=picked?esc(cur.name)+' · '+money(cur.price):(lo===hi?money(lo):money(lo)+' – '+money(hi));
+      return '<div class="wdd'+side+'"><button type="button" class="wbtn'+(picked?' on':'')+'" data-gbtn="'+gi.indexOf(t.g)+'" aria-haspopup="listbox" aria-expanded="'+op+'">'+
+        '<span class="nm">'+esc(t.g)+'<small>'+sub+'</small></span><span class="car">▼</span></button>'+
+        (op?'<div class="wmenu" role="listbox" aria-label="'+esc(t.g)+'">'+items.map(function(x){
+          var on=sel.svcId===x.id;
+          return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-svc="'+esc(x.id)+'"><span class="ck">✓</span><b>'+esc(x.name)+'</b><span class="pr">'+money(x.price)+'</span></button>';
+        }).join('')+'</div>':'')+'</div>';
+    });
+    $('svcChips').innerHTML='<div class="sgrid">'+cells.join('')+'</div>';
   }
   if(!db.workers.length){ wrkOpen=false; $('wrkChips').innerHTML='<div class="hint">Тохиргооноос ажилтан нэмнэ үү.</div>'; }
   else{
-    var today=dstr(new Date()), cntW={};
-    live().forEach(function(r){ if(r.date===today&&r.worker) cntW[r.worker]=(cntW[r.worker]||0)+1; });
     var has=sel.wrk&&db.workers.indexOf(sel.wrk)>=0;
-    $('wrkChips').innerHTML='<div class="wdd"><button type="button" class="wbtn" id="wrkBtn" aria-haspopup="listbox" aria-expanded="'+wrkOpen+'">'+
+    $('wrkChips').innerHTML='<div class="wdd wk"><button type="button" class="wbtn" id="wrkBtn" aria-haspopup="listbox" aria-expanded="'+wrkOpen+'">'+
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'+
       '<span class="nm'+(has?'':' ph')+'">'+(has?esc(sel.wrk):'Ажилтан сонгох')+'</span><span class="car">▼</span></button>'+
-      (wrkOpen?'<div class="wmenu" role="listbox" aria-label="Ажилтан">'+db.workers.map(function(w,i){
-        var n=cntW[w]||0;
+      (wrkOpen?'<div class="wmenu w2" role="listbox" aria-label="Ажилтан">'+db.workers.map(function(w,i){
         return '<button type="button" role="option" aria-selected="'+(sel.wrk===w)+'" class="'+(sel.wrk===w?'on':'')+'" data-wrk="'+i+'">'+
-          '<span class="ck">✓</span><b>'+esc(w)+'</b><small>'+(n?'Өнөөдөр '+n+' машин угаасан':'Өнөөдөр машин угаагаагүй')+'</small></button>';
+          '<span class="ck">✓</span><b>'+esc(w)+'</b></button>';
       }).join('')+'</div>':'')+'</div>';
   }
   $('payChips').innerHTML=PAYS.concat([SPLIT]).map(function(p,i){
@@ -653,19 +667,12 @@ $('svcChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-svc]');
   if(b){
     var s=svcById(b.getAttribute('data-svc')); if(!s) return;
-    pickSvc(s); svcOpen=false; drawChips(); try{$('svcBtn').focus();}catch(x){} return;
+    pickSvc(s); openGrp=null; drawChips(); return;
   }
-  var g=e.target.closest('[data-grp]');
+  var g=e.target.closest('[data-gbtn]');
   if(g){
-    var gname=svcGroups()[+g.getAttribute('data-grp')], items=db.services.filter(function(x){return x.g===gname;});
-    if(items.length===1){ pickSvc(items[0]); svcOpen=false; }
-    else{ openGrp=(openGrp===gname?null:gname); svcOpen=true; }
-    drawChips(); return;
-  }
-  if(e.target.closest('#svcBtn')){
-    svcOpen=!svcOpen; wrkOpen=false;
-    if(svcOpen){ var c=sel.svcId&&svcById(sel.svcId); openGrp=c&&c.g?c.g:null; }
-    drawChips();
+    var gname=svcGroups()[+g.getAttribute('data-gbtn')];
+    openGrp=(openGrp===gname?null:gname); wrkOpen=false; drawChips();
   }
 });
 function pickSvc(s){ sel.svcId=s.id; sel.svc=svcLabel(s); $('price').value=sel.free?0:s.price; drawSplit(); }
@@ -673,16 +680,16 @@ $('wrkChips').addEventListener('click',function(e){
   if(e.stopPropagation) e.stopPropagation(); /* дахин зурсны дараа document-ийн сонсогч цэсийг хаахгүй байх */
   var b=e.target.closest('[data-wrk]');
   if(b){ sel.wrk=db.workers[+b.getAttribute('data-wrk')]; wrkOpen=false; drawChips(); try{$('wrkBtn').focus();}catch(x){} return; }
-  if(e.target.closest('#wrkBtn')){ wrkOpen=!wrkOpen; svcOpen=false; drawChips(); }
+  if(e.target.closest('#wrkBtn')){ wrkOpen=!wrkOpen; openGrp=null; drawChips(); }
 });
 /* Цэсний гадна дарах эсвэл Esc дарахад хаагдана */
 document.addEventListener('click',function(e){
-  if(!wrkOpen&&!svcOpen) return;
+  if(!wrkOpen&&!openGrp) return;
   var t=e.target;
   if(t&&t.closest&&(t.closest('#wrkChips')||t.closest('#svcChips'))) return;
-  wrkOpen=false; svcOpen=false; drawChips();
+  wrkOpen=false; openGrp=null; drawChips();
 });
-document.addEventListener('keydown',function(e){ if((wrkOpen||svcOpen)&&e.key==='Escape'){ wrkOpen=false; svcOpen=false; drawChips(); } });
+document.addEventListener('keydown',function(e){ if((wrkOpen||openGrp)&&e.key==='Escape'){ wrkOpen=false; openGrp=null; drawChips(); } });
 $('payChips').addEventListener('click',function(e){
   var b=e.target.closest('[data-pay]'); if(!b) return;
   var np=PAYS.concat([SPLIT])[+b.getAttribute('data-pay')];
@@ -1433,7 +1440,7 @@ resetForm(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29d';
+  var APP_VER='2026-10-29e';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
