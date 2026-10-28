@@ -146,6 +146,18 @@ body.worker .rec{cursor:default}
 #setup{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:20;display:none;overflow:auto;padding:24px 16px}
 #setup.on{display:block}
 #setup .box{max-width:420px;margin:0 auto}
+#invite{position:fixed;inset:0;background:var(--bg);z-index:21;overflow:auto;
+  padding:24px max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#invite[hidden]{display:none}
+#invite .box{max-width:420px;margin:0 auto}
+.qr{background:#fff;border-radius:12px;padding:12px;margin:12px auto 4px;max-width:300px;min-height:60px;display:flex;align-items:center;justify-content:center}
+.qr svg{width:100%;height:auto;display:block}
+.qr .hint{color:#4a5560;text-align:center}
+.steps{margin:6px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+.steps li{margin:3px 0}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:18px 0 4px}
+.or:before,.or:after{content:"";flex:1;border-top:1px solid var(--line)}
+.warnbox{margin-top:8px;font-size:14px;color:var(--danger)}
 </style>
 </head>
 <body>
@@ -243,6 +255,8 @@ body.worker .rec{cursor:default}
     <button class="btn ghost adm" id="sendSet">Үнэ, ажилтан, урамшууллын мэдээг илгээх</button>
     <div class="hint adm">Гол утаснаас илгээвэл ажилтны утас үйлчлүүлэгч бүрийн угаалгын тоог мэдэж, урамшууллыг зөв тоолно.</div>
     <div class="hint wrk">Ажилтны утас зөвхөн гол утаснаас ирсэн үнэ, ажилтан, урамшууллын мэдээг хүлээн авна.</div>
+    <button class="btn adm" id="inviteBtn">Ажилтны утас нэмэх</button>
+    <div class="hint adm">Урилгын холбоос эсвэл QR код үүсгэнэ. Ажилтан түүнийг нээгээд утасныхаа нэрийг бичихэд л бүртгэгдэнэ.</div>
     <button class="btn ghost adm" id="toWorker">Энэ утсыг ажилтны утас болгох</button>
     <button class="btn ghost wrk" id="toMain">Гол утасны горим руу шилжих (PIN)</button>
   </div>
@@ -291,7 +305,20 @@ body.worker .rec{cursor:default}
     <label for="suName">Энэ утасны нэр</label>
     <input id="suName" autocomplete="off" placeholder="Жишээ: 1-р утас">
     <button class="btn" id="suMain">Гол утас</button>
-    <button class="btn ghost" id="suWorker">Ажилтны утас</button>
+    <button class="btn ghost" id="suWorker">Ажилтны утас (урилгагүйгээр)</button>
+    <div class="or">эсвэл</div>
+    <label for="suJoinIn">Гол утаснаас урилга авсан бол</label>
+    <input id="suJoinIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Урилгын холбоосоо энд буулгана уу">
+    <button class="btn ghost" id="suJoinBtn">Урилгаар бүртгүүлэх</button>
+  </div>
+  <div class="card" id="suJoin" style="display:none">
+    <h2>Ажилтны утсаар бүртгүүлэх</h2>
+    <div class="hint" id="suJInfo" style="margin:0 0 4px"></div>
+    <label for="suJName">Энэ утасны нэр</label>
+    <input id="suJName" autocomplete="off" placeholder="Жишээ: Бат-ын утас">
+    <div class="warnbox" id="suJWarn" hidden></div>
+    <button class="btn" id="suJOk">Бүртгүүлэх</button>
+    <button class="btn ghost" id="suJBack">Буцах</button>
   </div>
   <div class="card" id="suPin" style="display:none">
     <h2 id="suPinTitle"></h2>
@@ -300,6 +327,24 @@ body.worker .rec{cursor:default}
     <input id="suPinIn" type="password" inputmode="numeric" autocomplete="off">
     <button class="btn" id="suPinOk">Батлах</button>
     <button class="btn ghost" id="suPinBack">Буцах</button>
+  </div>
+</div></div>
+<div id="invite" hidden role="dialog" aria-modal="true" aria-labelledby="invTitle"><div class="box">
+  <div class="card">
+    <h2 id="invTitle">Ажилтны утас нэмэх</h2>
+    <ol class="steps">
+      <li>Ажилтны утасны камераар QR кодыг уншуулна, эсвэл холбоосыг Messenger-ээр илгээнэ.</li>
+      <li>Нээгдсэн хуудсанд утасныхаа нэрийг бичээд "Бүртгүүлэх" дарна.</li>
+      <li>Safari-ийн Хуваалцах → "Add to Home Screen" дарж нүүр дэлгэцэнд нэмнэ. Нүүр дэлгэцээс нээхэд тохируулах цонх дахин гарвал холбоосыг "Гол утаснаас урилга авсан бол" нүдэнд буулгана.</li>
+    </ol>
+    <div class="qr" id="invQr"><div class="hint">QR код ачаалж байна…</div></div>
+    <label for="invLink">Урилгын холбоос</label>
+    <input id="invLink" readonly>
+    <button class="btn" id="invShare">Холбоос илгээх</button>
+    <button class="btn ghost" id="invCopy">Холбоосыг хуулах</button>
+    <div class="hint" id="invInfo"></div>
+    <button class="btn ghost" id="invPin">Урилгын PIN солих</button>
+    <button class="btn ghost" id="invClose">Хаах</button>
   </div>
 </div></div>
 <nav>
@@ -1043,13 +1088,20 @@ function showSetup(step,mode){
   $('setup').classList.add('on');
   $('suRole').style.display=step==='role'?'block':'none';
   $('suPin').style.display=step==='pin'?'block':'none';
-  if(step==='role') $('suName').value=db.device||'';
+  $('suJoin').style.display=step==='join'?'block':'none';
+  if(step==='role'){ $('suName').value=db.device||''; $('suJoinIn').value=''; }
+  if(step==='join'&&joinInv){
+    $('suJName').value=''; $('suJWarn').hidden=true;
+    $('suJInfo').textContent='Гол утас: '+(joinInv.m||'—')+'. Үнэ, ажилтны жагсаалт, урамшууллын тохиргоо урилгаас автоматаар орно.';
+  }
   if(step==='pin'){
     pinMode=mode; $('suPinIn').value='';
-    $('suPinTitle').textContent=mode==='set'?'Түгжих PIN код тогтоох':'PIN кодоо оруулна уу';
+    $('suPinTitle').textContent=mode==='set'?'Түгжих PIN код тогтоох':mode==='owner'?'Урилгын PIN код тогтоох':'PIN кодоо оруулна уу';
     $('suPinHint').textContent=mode==='set'
       ?'Энэ утсыг дараа нь гол утас болгоход энэ код шаардагдана. Зөвхөн эзэн мэдэх, 4-өөс дээш оронтой тоо оруулна уу.'
-      :'Ажилтны утсыг тохируулахдаа тогтоосон кодыг оруулна уу.';
+      :mode==='owner'
+      ?'Урилгаар бүртгэгдсэн ажилтны утсыг гол утас болгоход энэ код шаардагдана. Ажилчдад хэлэхгүй, 4-өөс дээш оронтой тоо оруулна уу.'
+      :'Эзний тогтоосон PIN кодыг оруулна уу.';
   }
 }
 function applyRole(){
@@ -1069,7 +1121,10 @@ $('suMain').addEventListener('click',function(){ if(!suNameOk()) return; db.role
 $('suWorker').addEventListener('click',function(){ if(!suNameOk()) return; showSetup('pin','set'); });
 $('suPinOk').addEventListener('click',function(){
   var p=$('suPinIn').value.trim();
-  if(pinMode==='set'){
+  if(pinMode==='owner'){
+    if(!/^\d{4,}$/.test(p)){toast('4-өөс дээш оронтой тоо оруулна уу');return;}
+    db.pin=hash(p); save(); $('setup').classList.remove('on'); toast('PIN хадгалагдлаа'); openInvite();
+  }else if(pinMode==='set'){
     if(!/^\d{4,}$/.test(p)){toast('4-өөс дээш оронтой тоо оруулна уу');return;}
     db.pin=hash(p); db.role='worker'; roleDone('Ажилтны утас боллоо');
   }else{
@@ -1084,14 +1139,141 @@ $('toWorker').addEventListener('click',function(){
 });
 $('toMain').addEventListener('click',function(){ showSetup('pin','unlock'); });
 
+/* ---------- урилга ---------- */
+var joinInv=null;
+function b64e(str){
+  var bytes=new TextEncoder().encode(str), bin='';
+  for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64d(code){
+  var b=code.replace(/-/g,'+').replace(/_/g,'/'); while(b.length%4) b+='=';
+  var bin=atob(b), bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function knownDevices(){
+  var u={}; if(db.device) u[db.device]=1;
+  Object.keys(db.recv||{}).forEach(function(k){u[k]=1;});
+  live().forEach(function(r){ if(r.dev) u[r.dev]=1; });
+  return Object.keys(u);
+}
+function inviteUrl(){
+  var inv={v:1,m:db.device,p:db.pin,
+    s:db.services.map(function(x){return [x.id,x.name,x.price];}),
+    w:db.workers,lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
+  return location.origin+location.pathname+'#join='+b64e(JSON.stringify(inv));
+}
+function parseInvite(str){
+  var t=String(str||'').trim(), i=t.indexOf('join=');
+  var code=(i>=0?t.slice(i+5):t).split(/[\s&#]/)[0];
+  if(!code) return null;
+  try{
+    var d=JSON.parse(b64d(code));
+    if(!d||d.v!==1||!Array.isArray(d.s)||!Array.isArray(d.w)) return null;
+    return d;
+  }catch(e){ return null; }
+}
+function applyInvite(d){
+  db.services=d.s.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){
+    return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0};});
+  db.workers=d.w.filter(function(x){return typeof x==='string'&&x;});
+  if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
+  if(d.ln>=2) db.loyN=Math.round(d.ln);
+  if(typeof d.p==='string') db.pin=d.p;
+  sel.wrk=null;
+}
+$('suJoinBtn').addEventListener('click',function(){
+  var d=parseInvite($('suJoinIn').value);
+  if(!d){ toast('Урилгын холбоос буруу байна. Бүтнээр нь хуулж буулгана уу.'); return; }
+  joinInv=d; showSetup('join');
+});
+$('suJName').addEventListener('input',function(){
+  var n=this.value.trim().toLowerCase(), taken=joinInv&&(joinInv.u||[]).some(function(x){return String(x).toLowerCase()===n;});
+  $('suJWarn').hidden=!taken;
+  if(taken) $('suJWarn').textContent='"'+this.value.trim()+'" нэрийг өөр утас ашиглаж байна. Өөр нэр сонгоно уу.';
+});
+$('suJOk').addEventListener('click',function(){
+  var n=$('suJName').value.trim();
+  if(!n){ toast('Утасны нэрийг бичнэ үү'); $('suJName').focus(); return; }
+  if(!$('suJWarn').hidden){ toast('Өөр нэр сонгоно уу'); $('suJName').focus(); return; }
+  applyInvite(joinInv); db.device=n; db.role='worker'; joinInv=null;
+  roleDone('Бүртгэгдлээ: '+n);
+});
+$('suJBack').addEventListener('click',function(){ joinInv=null; showSetup('role'); });
+
+var qrLoad=null;
+function loadQR(){
+  if(window.qrcode) return Promise.resolve(window.qrcode);
+  if(qrLoad) return qrLoad;
+  var urls=['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.js',
+            'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'];
+  qrLoad=new Promise(function(res,rej){
+    (function next(i){
+      if(window.qrcode) return res(window.qrcode);
+      if(i>=urls.length){ qrLoad=null; return rej(); }
+      var sc=document.createElement('script'); sc.src=urls[i]; sc.async=true;
+      sc.onload=function(){ window.qrcode?res(window.qrcode):next(i+1); };
+      sc.onerror=function(){ sc.remove(); next(i+1); };
+      document.head.appendChild(sc);
+    })(0);
+  });
+  return qrLoad;
+}
+function openInvite(){
+  if(!db.device){ toast('Эхлээд энэ утасны нэрийг бичнэ үү'); $('devName').focus(); return; }
+  if(!db.pin){ showSetup('pin','owner'); return; }
+  var url=inviteUrl();
+  $('invLink').value=url;
+  $('invInfo').textContent='Урилгад '+db.services.length+' төрөл, '+db.workers.length+' ажилтан орсон. Үнэ өөрчилсний дараа шинэ урилга үүсгэнэ үү.';
+  $('invQr').innerHTML='<div class="hint">QR код ачаалж байна…</div>';
+  $('invite').hidden=false; window.scrollTo(0,0);
+  loadQR().then(function(q){
+    var qr=q(0,'L'); qr.addData(url); qr.make();
+    $('invQr').innerHTML=qr.createSvgTag(4,2);
+  },function(){
+    $('invQr').innerHTML='<div class="hint">QR код үүсгэхэд интернэт хэрэгтэй. Холбоосыг илгээж болно.</div>';
+  });
+}
+$('inviteBtn').addEventListener('click',openInvite);
+$('invClose').addEventListener('click',function(){ $('invite').hidden=true; });
+$('invPin').addEventListener('click',function(){ $('invite').hidden=true; showSetup('pin','owner'); });
+$('invCopy').addEventListener('click',function(){
+  var v=$('invLink').value;
+  var sel2=function(){ try{ $('invLink').focus(); $('invLink').select(); $('invLink').setSelectionRange(0,v.length); }catch(e){} };
+  try{
+    navigator.clipboard.writeText(v).then(function(){ toast('Холбоос хуулагдлаа'); },function(){ sel2(); toast('Холбоосыг тэмдэглээд хуулна уу'); });
+  }catch(e){ sel2(); toast('Холбоосыг тэмдэглээд хуулна уу'); }
+});
+$('invShare').addEventListener('click',function(){
+  var v=$('invLink').value;
+  if(navigator.share){
+    navigator.share({title:'Угаалгын бүртгэл',text:'Угаалгын бүртгэлийн аппад ажилтны утсаар бүртгүүлэх холбоос:',url:v}).catch(function(){});
+  }else $('invCopy').click();
+});
+function checkJoinHash(){
+  var h=location.hash||'';
+  if(h.indexOf('#join=')!==0) return;
+  var d=parseInvite(h);
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){ location.hash=''; }
+  if(!d){ toast('Урилгын холбоос буруу байна'); return; }
+  if(!db.role){ joinInv=d; showSetup('join'); return; }
+  if(db.role==='main'){ toast('Энэ бол гол утас. Урилгыг ажилтны утсанд нээнэ үү.'); return; }
+  ask('Энэ утас аль хэдийн "'+db.device+'" нэрээр бүртгэгдсэн. Урилгаас үнэ, ажилтан, урамшууллын тохиргоог шинэчлэх үү?','Шинэчлэх').then(function(ok){
+    if(!ok) return; applyInvite(d); save(); drawChips(); refreshAll(); toast('Тохиргоо шинэчлэгдлээ');
+  });
+}
+window.addEventListener('hashchange',checkJoinHash);
+
 var now=new Date();
 $('fDate').value=dstr(now);
-resetForm(); refreshAll(); applyRole();
+resetForm(); refreshAll(); applyRole(); checkJoinHash();
 })();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-28';
+  var APP_VER='2026-10-29';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
