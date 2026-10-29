@@ -182,6 +182,9 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .trk .tl{font-size:14px;margin-top:var(--s2)}
 .trk.warn .tl{color:var(--danger);font-weight:600}
 .trk .hint{margin-top:var(--s1)}
+.exrow{display:flex;align-items:center;gap:var(--s2)}
+.exrow .rec{flex:1;min-width:0}
+.exrow .x{flex:none;min-width:40px;min-height:40px;font-size:16px}
 .exsum{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s2);margin-top:var(--s3);font-weight:700;font-variant-numeric:tabular-nums}
 .stat .v.neg{color:var(--danger)}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s3)}
@@ -1640,9 +1643,10 @@ function drawExList(){
   var rows=liveEx().filter(function(e){return e.date>=rg[0]&&e.date<=rg[1];}).sort(function(a,b){return dt(b.date,b.time).localeCompare(dt(a.date,a.time));});
   var tot=rows.reduce(function(a,e){return a+(+e.amt||0);},0);
   $('exByCat').innerHTML=rows.length?'<div class="exsum"><span>Нийт '+rows.length+' зарлага</span><span>'+money(tot)+'</span></div>'+bars(exByCat(rows),tot):'';
-  $('exList').innerHTML=rows.length?'<div style="margin-top:12px">'+rows.slice(0,300).map(function(e){
-    return '<div class="rec" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+'</div>'+
-      '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>';
+  $('exList').innerHTML=rows.length?'<div class="hint" style="margin:12px 0 0">Мөр дээр дарж засна, × дарж устгана.</div><div>'+rows.slice(0,300).map(function(e){
+    return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+'</div>'+
+      '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>'+
+      '<button type="button" class="x" data-exdel="'+esc(e.id)+'" aria-label="'+esc(exCatName(e))+' '+money(e.amt)+' зарлагыг устгах">×</button></div>';
   }).join('')+'</div>':'<div class="empty">Энэ хугацаанд зарлага алга</div>';
 }
 function drawExp(){ if(!$('exCats').innerHTML||!exEdit) drawExCats(); drawTrack(); drawExList(); }
@@ -1661,7 +1665,17 @@ $('exSave').addEventListener('click',function(){
   else{ db.expenses.push(e); toast('Хадгаллаа: '+e.catName+' · '+money(amt)); }
   save(); exReset(); drawTrack(); drawExList();
 });
+function exRemove(id){
+  var e=db.expenses.filter(function(x){return x.id===id;})[0]; if(!e) return;
+  ask(exCatName(e)+' · '+money(e.amt)+' ('+e.date+' '+(e.time||'')+')'+(e.note?'\n'+e.note:'')+'\n\nЭнэ зарлагыг устгах уу?','Устгах').then(function(ok){
+    if(!ok) return;
+    e.del=true; e.upd=Date.now();
+    if(exEdit===id) exReset();
+    save(); drawTrack(); drawExList(); toast('Устгалаа');
+  });
+}
 $('exList').addEventListener('click',function(ev){
+  var d=ev.target.closest('[data-exdel]'); if(d){ exRemove(d.getAttribute('data-exdel')); return; }
   var r=ev.target.closest('[data-exid]'); if(!r) return;
   var e=db.expenses.filter(function(x){return x.id===r.getAttribute('data-exid');})[0]; if(!e) return;
   exEdit=e.id; exSel=e.cat; $('exAmt').value=e.amt; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
@@ -1670,10 +1684,7 @@ $('exList').addEventListener('click',function(ev){
 });
 $('exCancel').addEventListener('click',function(){ exReset(); });
 $('exDel').addEventListener('click',function(){
-  if(!exEdit) return; var id=exEdit;
-  ask('Энэ зарлагыг устгах уу?','Устгах').then(function(ok){ if(!ok) return;
-    db.expenses.forEach(function(x){ if(x.id===id){ x.del=true; x.upd=Date.now(); } });
-    save(); exReset(); drawTrack(); drawExList(); toast('Устгалаа'); });
+  if(exEdit) exRemove(exEdit);
 });
 $('exPeriod').addEventListener('change',drawExList);
 $('exCsv').addEventListener('click',function(){
@@ -1904,7 +1915,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29k';
+  var APP_VER='2026-10-29l';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
