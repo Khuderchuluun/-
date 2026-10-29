@@ -182,6 +182,12 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .trk .tl{font-size:14px;margin-top:var(--s2)}
 .trk.warn .tl{color:var(--danger);font-weight:600}
 .trk .hint{margin-top:var(--s1)}
+.qrow{display:flex;align-items:center;gap:var(--s2)}
+.qrow input{flex:1;min-width:0}
+.qrow .un{flex:none;min-width:40px;font-weight:600;color:var(--muted)}
+.ecat{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s2)}
+.ecat .setrow:last-child{margin-bottom:0}
+.ecat .sm{max-width:90px}
 .exrow{display:flex;align-items:center;gap:var(--s2)}
 .exrow .rec{flex:1;min-width:0}
 .exrow .x{flex:none;min-width:40px;min-height:40px;font-size:16px}
@@ -370,6 +376,10 @@ body.worker .rec{cursor:default}
     <div class="sgrid" id="exCats"></div>
     <label for="exAmt">Дүн (₮)</label>
     <input id="exAmt" type="number" inputmode="numeric" min="0" step="500" placeholder="0">
+    <div id="exQtyBox" hidden>
+      <label for="exQty">Хэмжээ</label>
+      <div class="qrow"><input id="exQty" type="number" inputmode="decimal" min="0" step="any" placeholder="0"><span class="un" id="exUnit"></span></div>
+    </div>
     <div class="row">
       <div><label for="exDate">Огноо</label><input id="exDate" type="date"></div>
       <div><label for="exTime">Цаг</label><input id="exTime" type="time"></div>
@@ -461,7 +471,7 @@ body.worker .rec{cursor:default}
     <details class="acc" id="accEx">
       <summary><span class="at">Зарлагын ангилал</span><span class="as" id="accExSum"></span><span class="car" aria-hidden="true">▼</span></summary>
       <div class="acc-body">
-    <div class="hint" style="margin:0 0 8px">"Тооцоолох" чагталсан ангилалд нөхсөн хооронд хэдэн машин угаасныг тоолж, хэзээ дуусахыг тооцоолно.</div>
+    <div class="hint" style="margin:0 0 8px">"Тооцоолох" чагталсан ангилалд нөхсөн хооронд хэдэн машин угаасныг тоолж, хэзээ дуусахыг тооцоолно. Нэгж (тн, л) ба нэг удаа авдаг хэмжээг оруулбал бүртгэхэд автоматаар бөглөгдөнө.</div>
     <div id="exCatSet"></div>
     <button class="btn ghost" id="addExCat">+ Ангилал нэмэх</button>
       </div>
@@ -582,8 +592,8 @@ function defaults(){
     lastSent:null,
     expenses:[],
     expCats:[
-      {id:'e1',name:'Ус',track:true},{id:'e2',name:'Түлээ, нүүрс',track:false},{id:'e3',name:'Угаалгын хөөс',track:true},
-      {id:'e4',name:'Өнгөлөгч',track:true},{id:'e5',name:'Багаж хэрэгсэл',track:false},{id:'e6',name:'Бусад',track:false}],
+      {id:'e1',name:'Ус',track:true,unit:'тн',qty:3},{id:'e2',name:'Түлээ, нүүрс',track:false,unit:'',qty:0},{id:'e3',name:'Угаалгын хөөс',track:true,unit:'л',qty:0},
+      {id:'e4',name:'Өнгөлөгч',track:true,unit:'л',qty:0},{id:'e5',name:'Багаж хэрэгсэл',track:false,unit:'',qty:0},{id:'e6',name:'Бусад',track:false,unit:'',qty:0}],
     extras:[{id:'x1',name:'Тааз',price:10000,g:''},{id:'x2',name:'Мотор бодисоор угаах',price:15000,g:''}]
   };
 }
@@ -616,6 +626,10 @@ function normalize(d){
   if(!Array.isArray(d.extras)) d.extras=b.extras;
   if(!Array.isArray(d.expenses)) d.expenses=[];
   if(!Array.isArray(d.expCats)) d.expCats=b.expCats;
+  d.expCats.forEach(function(c){
+    if(typeof c.unit!=='string'){ var dc=b.expCats.filter(function(x){return x.id===c.id;})[0]; c.unit=dc?dc.unit:''; if(!(c.qty>=0)) c.qty=dc?dc.qty:0; }
+    if(!(c.qty>=0)) c.qty=0;
+  });
   d.extras.forEach(function(x){ if(x&&typeof x.g!=='string') x.g=''; });
   return d;
 }
@@ -1591,6 +1605,8 @@ function exByCat(list){
   return o.sort(function(a,b){return b.sum-a.sum;});
 }
 function dt(d,t){ return (d||'')+' '+(t||'00:00'); }
+function num(n){ var v=Math.round(n*100)/100; return String(v).replace('.',','); }
+function qtyTxt(e){ var c=exCat(e.cat), u=e.unit||(c&&c.unit)||''; return e.qty>0?num(e.qty)+(u?' '+u:''):''; }
 /* Нөхсөн бүрийн хооронд угаасан машины тоо */
 function exCycles(catId){
   var fills=liveEx().filter(function(e){return e.cat===catId;}).sort(function(a,b){return dt(a.date,a.time).localeCompare(dt(b.date,b.time));});
@@ -1600,13 +1616,20 @@ function exCycles(catId){
   var done=[];
   for(var i=0;i<fills.length-1;i++){
     var a=dt(fills[i].date,fills[i].time), b=dt(fills[i+1].date,fills[i+1].time), n=cnt(a,b);
-    done.push({n:n,amt:+fills[i].amt||0});
+    done.push({n:n,amt:+fills[i].amt||0,q:+fills[i].qty||0});
   }
   var last=fills[fills.length-1], cur=cnt(dt(last.date,last.time),null);
   var useful=done.filter(function(c){return c.n>0;}).slice(-5);
-  var avg=useful.length?Math.round(useful.reduce(function(a,c){return a+c.n;},0)/useful.length):0;
-  var cpc=useful.length?useful.reduce(function(a,c){return a+c.amt;},0)/useful.reduce(function(a,c){return a+c.n;},0):0;
-  return {last:last,cur:cur,avg:avg,cpc:cpc,k:useful.length};
+  var sumN=useful.reduce(function(a,c){return a+c.n;},0);
+  var avg=useful.length?Math.round(sumN/useful.length):0;
+  var cpc=useful.length?useful.reduce(function(a,c){return a+c.amt;},0)/sumN:0;
+  /* Хэмжээ бүртгэгдсэн бол: 1 нэгж хэдэн машинд хүрдгийг олоод одоогийн нөөцийн хэмжээгээр үржүүлнэ */
+  var byQty=useful.length&&useful.every(function(c){return c.q>0;})&&(+last.qty>0), cpu=0, qpc=0;
+  if(byQty){
+    var sumQ=useful.reduce(function(a,c){return a+c.q;},0);
+    cpu=sumN/sumQ; qpc=sumQ/sumN; avg=Math.round(cpu*(+last.qty));
+  }
+  return {last:last,cur:cur,avg:avg,cpc:cpc,k:useful.length,byQty:byQty,cpu:cpu,qpc:qpc};
 }
 function drawTrack(){
   var cats=db.expCats.filter(function(c){return c.track;});
@@ -1615,12 +1638,16 @@ function drawTrack(){
     var y=exCycles(c.id);
     if(!y) return '<div class="trk"><div class="th"><span class="tn">'+esc(c.name)+'</span></div><div class="hint">Нөхсөн үедээ энд зарлага бүртгэнэ үү.</div></div>';
     var head='<div class="th"><span class="tn">'+esc(c.name)+'</span><span class="tv">'+y.cur+' <small>машин</small></span></div>'+
-      '<div class="hint">Сүүлд нөхсөн: '+esc(y.last.date)+' '+esc(y.last.time||'')+' · '+money(y.last.amt)+'</div>';
+      '<div class="hint">Сүүлд нөхсөн: '+esc(y.last.date)+' '+esc(y.last.time||'')+(qtyTxt(y.last)?' · '+esc(qtyTxt(y.last)):'')+' · '+money(y.last.amt)+'</div>';
     if(!y.avg) return '<div class="trk">'+head+'<div class="tl">Дараагийн удаа нөхөхөд нэг удаагийн нөөц хэдэн машинд хүрдгийг тооцоолж эхэлнэ.</div></div>';
     var left=y.avg-y.cur, warn=left<=Math.max(1,Math.round(y.avg*0.1)), pct=Math.min(100,Math.round(y.cur/y.avg*100));
     return '<div class="trk'+(warn?' warn':'')+'">'+head+'<div class="g"><i style="width:'+Math.max(2,pct)+'%"></i></div>'+
       '<div class="tl">'+(left>0?'Ойролцоогоор '+left+' машины дараа дуусна':'Дундаж хэмжээнд хүрсэн. Удахгүй дуусах магадлалтай.')+'</div>'+
-      '<div class="hint">Нэг удаагийн нөөц дунджаар '+y.avg+' машинд хүрдэг · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div></div>';
+      (y.byQty?(function(){
+        var u=y.last.unit||c.unit||'', per=(u==='тн')?' · 1 машинд ~'+Math.round(y.qpc*1000)+' л':(u?' · 1 машинд ~'+num(y.qpc)+' '+esc(u):'');
+        return '<div class="hint">1 '+esc(u||'нэгж')+' дунджаар '+num(y.cpu)+' машинд хүрдэг'+per+' · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div>'+
+          '<div class="hint">Одоогийн '+esc(qtyTxt(y.last))+' ойролцоогоор '+y.avg+' машинд хүрнэ</div>';
+      })():'<div class="hint">Нэг удаагийн нөөц дунджаар '+y.avg+' машинд хүрдэг · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div>')+'</div>';
   }).join('');
 }
 function drawExCats(){
@@ -1629,12 +1656,13 @@ function drawExCats(){
     return '<button type="button" class="wbtn'+(on?' on':'')+'" data-exc="'+esc(c.id)+'" aria-pressed="'+on+'"><span class="nm">'+esc(c.name)+(c.track?'<small>Дуусахыг тооцоолно</small>':'')+'</span></button>';
   }).join('')||'<div class="hint">Тохиргооноос ангилал нэмнэ үү.</div>';
   var c=exSel&&exCat(exSel), h=$('exHint');
+  $('exQtyBox').hidden=!(c&&c.unit); $('exUnit').textContent=c&&c.unit?c.unit:'';
   if(c&&c.track&&!exEdit){ h.hidden=false; h.textContent='Огноо, цагийг яг нөхсөн үеэр нь оруулаарай. Түүнээс хойш угаасан машин энэ нөөцөд тоологдоно.'; }
   else h.hidden=true;
 }
 function exReset(){
   exEdit=null; exSel=null; var now=new Date();
-  $('exAmt').value=''; $('exNote').value=''; $('exDate').value=dstr(now); $('exTime').value=tstr(now);
+  $('exAmt').value=''; $('exNote').value=''; $('exQty').value=''; $('exDate').value=dstr(now); $('exTime').value=tstr(now);
   $('exTitle').textContent='Зарлага бүртгэх'; $('exSave').textContent='Хадгалах';
   $('exCancel').hidden=true; $('exDel').hidden=true; drawExCats();
 }
@@ -1644,7 +1672,7 @@ function drawExList(){
   var tot=rows.reduce(function(a,e){return a+(+e.amt||0);},0);
   $('exByCat').innerHTML=rows.length?'<div class="exsum"><span>Нийт '+rows.length+' зарлага</span><span>'+money(tot)+'</span></div>'+bars(exByCat(rows),tot):'';
   $('exList').innerHTML=rows.length?'<div class="hint" style="margin:12px 0 0">Мөр дээр дарж засна, × дарж устгана.</div><div>'+rows.slice(0,300).map(function(e){
-    return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+'</div>'+
+    return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+(qtyTxt(e)?' <span style="font-weight:400;color:var(--muted)">· '+esc(qtyTxt(e))+'</span>':'')+'</div>'+
       '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>'+
       '<button type="button" class="x" data-exdel="'+esc(e.id)+'" aria-label="'+esc(exCatName(e))+' '+money(e.amt)+' зарлагыг устгах">×</button></div>';
   }).join('')+'</div>':'<div class="empty">Энэ хугацаанд зарлага алга</div>';
@@ -1652,7 +1680,10 @@ function drawExList(){
 function drawExp(){ if(!$('exCats').innerHTML||!exEdit) drawExCats(); drawTrack(); drawExList(); }
 $('exCats').addEventListener('click',function(e){
   var b=e.target.closest('[data-exc]'); if(!b) return;
-  exSel=b.getAttribute('data-exc'); drawExCats();
+  var prev=exSel; exSel=b.getAttribute('data-exc');
+  var c=exCat(exSel);
+  if(!exEdit&&prev!==exSel) $('exQty').value=c&&c.unit&&c.qty>0?c.qty:'';
+  drawExCats();
 });
 $('exSave').addEventListener('click',function(){
   if(!exSel){ toast('Ангиллаа сонгоно уу'); return; }
@@ -1661,6 +1692,8 @@ $('exSave').addEventListener('click',function(){
   var now=new Date(), c=exCat(exSel);
   var e={id:exEdit||uid(),cat:exSel,catName:c?c.name:'',amt:amt,date:$('exDate').value||dstr(now),time:$('exTime').value||tstr(now),
     note:$('exNote').value.trim(),dev:db.device,upd:Date.now()};
+  var q=parseFloat(String($('exQty').value).replace(',','.'));
+  if(c&&c.unit&&q>0){ e.qty=q; e.unit=c.unit; }
   if(exEdit){ for(var i=0;i<db.expenses.length;i++) if(db.expenses[i].id===exEdit){ db.expenses[i]=e; break; } toast('Засвар хадгалагдлаа'); }
   else{ db.expenses.push(e); toast('Хадгаллаа: '+e.catName+' · '+money(amt)); }
   save(); exReset(); drawTrack(); drawExList();
@@ -1678,7 +1711,7 @@ $('exList').addEventListener('click',function(ev){
   var d=ev.target.closest('[data-exdel]'); if(d){ exRemove(d.getAttribute('data-exdel')); return; }
   var r=ev.target.closest('[data-exid]'); if(!r) return;
   var e=db.expenses.filter(function(x){return x.id===r.getAttribute('data-exid');})[0]; if(!e) return;
-  exEdit=e.id; exSel=e.cat; $('exAmt').value=e.amt; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
+  exEdit=e.id; exSel=e.cat; $('exAmt').value=e.amt; $('exQty').value=e.qty>0?e.qty:''; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
   $('exTitle').textContent='Зарлага засах'; $('exSave').textContent='Засварыг хадгалах';
   $('exCancel').hidden=false; $('exDel').hidden=false; drawExCats(); window.scrollTo(0,0);
 });
@@ -1690,16 +1723,18 @@ $('exPeriod').addEventListener('change',drawExList);
 $('exCsv').addEventListener('click',function(){
   var rows=liveEx().sort(function(a,b){return dt(a.date,a.time).localeCompare(dt(b.date,b.time));});
   if(!rows.length){ toast('Зарлага алга'); return; }
-  var out=[['Огноо','Цаг','Ангилал','Дүн','Тайлбар'].join(',')];
-  rows.forEach(function(e){ out.push([e.date,e.time,exCatName(e),e.amt,e.note].map(csvCell).join(',')); });
+  var out=[['Огноо','Цаг','Ангилал','Хэмжээ','Нэгж','Дүн','Тайлбар'].join(',')];
+  rows.forEach(function(e){ out.push([e.date,e.time,exCatName(e),e.qty>0?e.qty:'',e.qty>0?(e.unit||''):'',e.amt,e.note].map(csvCell).join(',')); });
   download('zarlaga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
 });
 /* Тохиргоо: ангилал */
 function drawExCatSet(){
   $('exCatSet').innerHTML=db.expCats.map(function(c,i){
-    return '<div class="setrow"><input data-ecn="'+i+'" value="'+esc(c.name)+'" placeholder="Нэр" aria-label="Ангиллын нэр">'+
-      '<label class="chk" style="margin:0;flex:none;font-size:13px"><input type="checkbox" data-ect="'+i+'"'+(c.track?' checked':'')+'> Тооцоолох</label>'+
-      '<button class="x" data-ecx="'+i+'" aria-label="Устгах">×</button></div>';
+    return '<div class="ecat"><div class="setrow"><input data-ecn="'+i+'" value="'+esc(c.name)+'" placeholder="Нэр" aria-label="Ангиллын нэр">'+
+      '<button class="x" data-ecx="'+i+'" aria-label="Устгах">×</button></div>'+
+      '<div class="setrow"><input class="sm" data-ecu="'+i+'" value="'+esc(c.unit||'')+'" placeholder="Нэгж" aria-label="Нэгж (тн, л, шуудай)">'+
+      '<input class="sm" data-ecq="'+i+'" type="number" inputmode="decimal" step="any" min="0" value="'+(c.qty>0?esc(c.qty):'')+'" placeholder="Хэмжээ" aria-label="Нэг удаа авах хэмжээ">'+
+      '<label class="chk" style="margin:0;flex:none;font-size:13px"><input type="checkbox" data-ect="'+i+'"'+(c.track?' checked':'')+'> Тооцоолох</label></div></div>';
   }).join('');
   if($('accExSum')) $('accExSum').textContent=db.expCats.length+' ангилал';
 }
@@ -1707,6 +1742,8 @@ $('exCatSet').addEventListener('change',function(e){
   var t=e.target;
   if(t.hasAttribute('data-ecn')) db.expCats[+t.getAttribute('data-ecn')].name=t.value.trim()||'Нэргүй';
   if(t.hasAttribute('data-ect')) db.expCats[+t.getAttribute('data-ect')].track=!!t.checked;
+  if(t.hasAttribute('data-ecu')) db.expCats[+t.getAttribute('data-ecu')].unit=t.value.trim();
+  if(t.hasAttribute('data-ecq')){ var qv=parseFloat(String(t.value).replace(',','.')); db.expCats[+t.getAttribute('data-ecq')].qty=qv>0?qv:0; }
   save(); drawExCats(); drawTrack();
 });
 $('exCatSet').addEventListener('click',function(e){
@@ -1716,7 +1753,7 @@ $('exCatSet').addEventListener('click',function(e){
     if(!ok) return; db.expCats.splice(i,1); save(); drawExCatSet(); drawExCats(); drawTrack(); });
 });
 $('addExCat').addEventListener('click',function(){
-  db.expCats.push({id:uid(),name:'Шинэ ангилал',track:false}); save(); drawExCatSet(); drawExCats();
+  db.expCats.push({id:uid(),name:'Шинэ ангилал',track:false,unit:'',qty:0}); save(); drawExCatSet(); drawExCats();
   try{ var ins=document.querySelectorAll('#exCatSet [data-ecn]'); ins[ins.length-1].focus(); ins[ins.length-1].select(); }catch(x){}
 });
 function refreshAll(){ drawList(); drawReport(); drawSettings(); drawExp(); }
@@ -1915,7 +1952,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29l';
+  var APP_VER='2026-10-29m';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
