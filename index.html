@@ -1669,6 +1669,16 @@ function exCycles(catId){
   }
   return {last:last,cur:cur,avg:avg,cpc:cpc,k:useful.length,byQty:byQty,cpu:cpu,qpc:qpc};
 }
+/* Тооцоолж буй ангиллын зарлага бүрт: тэр удаа нөхсөнөөс дараагийн нөхөлт хүртэл (сүүлийнх нь одоо хүртэл) угаасан машин */
+function exCarsById(){
+  var out={}, cars=live().map(function(r){return dt(r.date,r.time);}).sort();
+  var cnt=function(from,to){ var n=0; for(var i=0;i<cars.length;i++){ if(cars[i]>=from&&(!to||cars[i]<to)) n++; } return n; };
+  db.expCats.filter(function(c){return c.track;}).forEach(function(c){
+    var f=liveEx().filter(function(e){return e.cat===c.id;}).sort(function(a,b){return dt(a.date,a.time).localeCompare(dt(b.date,b.time));});
+    f.forEach(function(e,i){ out[e.id]={n:cnt(dt(e.date,e.time),f[i+1]?dt(f[i+1].date,f[i+1].time):null),cur:!f[i+1]}; });
+  });
+  return out;
+}
 function drawTrack(){
   var cats=db.expCats.filter(function(c){return c.track;});
   $('trkCard').hidden=!cats.length; if(!cats.length) return;
@@ -1712,8 +1722,10 @@ function drawExList(){
   $('exByCat').innerHTML=rows.length?'<div class="exsum"><span class="h">Зарлага</span><span class="h n">Угаасан машин</span><span class="h n">Зарцуулсан</span>'+
     '<b>Нийт '+rows.length+' зарлага</b><b class="n">'+cars+'</b><b class="n">'+money(tot)+'</b></div>'+
     (cars?'<div class="hint">1 машинд ногдох зарлага ~'+money(tot/cars)+'</div>':'')+bars(exByCat(rows),tot):'';
+  var ecars=exCarsById();
   $('exList').innerHTML=rows.length?'<div class="hint" style="margin:12px 0 0">Мөр дээр дарж засна, × дарж устгана.</div><div>'+rows.slice(0,300).map(function(e){
-    return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+(qtyTxt(e)?' <span style="font-weight:400;color:var(--muted)">· '+esc(qtyTxt(e))+'</span>':'')+'</div>'+
+    return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+(qtyTxt(e)?' <span style="font-weight:400;color:var(--muted)">· '+esc(qtyTxt(e))+'</span>':'')+
+        (ecars[e.id]?' <span style="font-weight:400;color:var(--muted)">· машин '+ecars[e.id].n+(ecars[e.id].cur?' (одоо хүртэл)':'')+'</span>':'')+'</div>'+
       '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>'+
       '<button type="button" class="x" data-exdel="'+esc(e.id)+'" aria-label="'+esc(exCatName(e))+' '+money(e.amt)+' зарлагыг устгах">×</button></div>';
   }).join('')+'</div>':'<div class="empty">Энэ хугацаанд зарлага алга</div>';
@@ -1994,7 +2006,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-31';
+  var APP_VER='2026-10-31b';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
