@@ -147,6 +147,11 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .sgrid .wdd.r .wmenu{left:auto;right:0}
 .wdd.wk .wbtn{font-size:13px;min-height:46px}
 .wmenu.w2{display:grid;grid-template-columns:1fr 1fr}
+.wmenu .mh{grid-column:1/-1;font-size:12px;color:var(--muted);padding:var(--s2) var(--s3);border-bottom:1px solid var(--line)}
+.coRow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);margin-top:var(--s2)}
+.coChip{display:inline-flex;align-items:center;gap:var(--s1);border:1px solid var(--brand);background:var(--soft);color:var(--text);border-radius:10px;padding:var(--s1) var(--s1) var(--s1) var(--s2);font-size:13px}
+.coChip button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:15px;min-width:28px;min-height:28px;cursor:pointer}
+.coAdd{border:1px dashed var(--line);background:transparent;color:var(--brand);border-radius:10px;padding:var(--s1) var(--s2);font:inherit;font-size:12px;min-height:32px;cursor:pointer}
 .wmenu.w2 button{grid-template-columns:20px 1fr;padding:var(--s3) var(--s2);border-top:1px solid var(--line);min-height:46px}
 .wmenu.w2 button:nth-child(-n+2){border-top:0}
 .wmenu.w2 button:nth-child(even){border-left:1px solid var(--line)}
@@ -712,7 +717,10 @@ function svcGroups(){var o=[],m={};db.services.forEach(function(x){var g=x.g||''
 /* ---------- цалин ---------- */
 function pctOf(w){var p=db.pct[w];return (typeof p==='number'&&p>=0)?p:DEF_PCT;}
 function commBase(r){if(r.own) return +r.list||0; return r.free?(db.freePct?(+r.list||0):0):(+r.price||0);}
-function comm(r){return r.worker?commBase(r)*pctOf(r.worker)/100:0;}
+function wList(r){ return (Array.isArray(r.workers)&&r.workers.length)?r.workers:(r.worker?[r.worker]:[]); }
+/* Хэд хэдэн угаагч хамт угаавал үнийг тэнцүү хувааж, хүн бүрийн хувиар бодно */
+function commFor(r,w){ var l=wList(r); return l.indexOf(w)>=0?commBase(r)/l.length*pctOf(w)/100:0; }
+function comm(r){ return wList(r).reduce(function(a,w){return a+commFor(r,w);},0); }
 
 /* ---------- байнгын үйлчлүүлэгч ---------- */
 /* Энэ утсан дээрх бүртгэл + үндсэн утаснаас ирсэн товч жагсаалтыг id-аар нэгтгэнэ (давхар тоолохгүй) */
@@ -766,7 +774,7 @@ function loyalty(pk,exceptId){
 }
 
 /* ---------- add / edit form ---------- */
-var sel={svc:null,svcId:null,wrk:null,pay:PAYS[0],free:false,own:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false;
+var sel={svc:null,svcId:null,wrk:null,co:[],pay:PAYS[0],free:false,own:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false, wrkAdd=false;
 
 /* Бүртгэлийн төлбөрийг хэлбэр бүрээр задлана: {Бэлэн:x, Карт:y, Шилжүүлэг:z} */
 function payParts(r){
@@ -829,13 +837,21 @@ function drawChips(){
   if(!db.workers.length){ wrkOpen=false; $('wrkChips').innerHTML='<div class="hint">Тохиргооноос ажилтан нэмнэ үү.</div>'; }
   else{
     var has=sel.wrk&&db.workers.indexOf(sel.wrk)>=0;
+    if(!has) sel.co=[];
+    sel.co=sel.co.filter(function(w){return w!==sel.wrk&&db.workers.indexOf(w)>=0;});
+    var pool=wrkAdd?db.workers.filter(function(w){return w!==sel.wrk;}):db.workers;
     $('wrkChips').innerHTML='<div class="wdd wk"><button type="button" class="wbtn" id="wrkBtn" aria-haspopup="listbox" aria-expanded="'+wrkOpen+'">'+
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'+
       '<span class="nm'+(has?'':' ph')+'">'+(has?esc(sel.wrk):'Ажилтан сонгох')+'</span><span class="car">▼</span></button>'+
-      (wrkOpen?'<div class="wmenu w2" role="listbox" aria-label="Ажилтан">'+db.workers.map(function(w,i){
-        return '<button type="button" role="option" aria-selected="'+(sel.wrk===w)+'" class="'+(sel.wrk===w?'on':'')+'" data-wrk="'+i+'">'+
+      (wrkOpen?'<div class="wmenu w2" role="listbox" aria-label="Ажилтан">'+(wrkAdd?'<div class="mh">Хамт угаасан ажилтан</div>':'')+pool.map(function(w){
+        var on=wrkAdd?sel.co.indexOf(w)>=0:sel.wrk===w;
+        return '<button type="button" role="option" aria-selected="'+on+'" class="'+(on?'on':'')+'" data-wrk="'+db.workers.indexOf(w)+'">'+
           '<span class="ck">✓</span><b>'+esc(w)+'</b></button>';
-      }).join('')+'</div>':'')+'</div>';
+      }).join('')+'</div>':'')+'</div>'+
+      (has?'<div class="coRow">'+sel.co.map(function(w){
+        return '<span class="coChip">+ '+esc(w)+'<button type="button" data-corm="'+db.workers.indexOf(w)+'" aria-label="'+esc(w)+'-г хасах">×</button></span>';
+      }).join('')+(db.workers.length>sel.co.length+1?'<button type="button" class="coAdd" id="coAdd">+ Хамт угаасан ажилтан</button>':'')+
+      (sel.co.length?'<span class="hint" style="margin:0">Цалин '+(sel.co.length+1)+' хүнд тэнцүү хуваагдана</span>':'')+'</div>':'');
   }
   var PICO={
     'Бэлэн':'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
@@ -965,8 +981,16 @@ $('xList').addEventListener('click',function(e){
 $('wrkChips').addEventListener('click',function(e){
   if(e.stopPropagation) e.stopPropagation(); /* дахин зурсны дараа document-ийн сонсогч цэсийг хаахгүй байх */
   var b=e.target.closest('[data-wrk]');
-  if(b){ sel.wrk=db.workers[+b.getAttribute('data-wrk')]; wrkOpen=false; drawChips(); try{$('wrkBtn').focus();}catch(x){} return; }
-  if(e.target.closest('#wrkBtn')){ wrkOpen=!wrkOpen; openGrp=null; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips(); }
+  if(b){
+    var w=db.workers[+b.getAttribute('data-wrk')];
+    if(wrkAdd){ var k=sel.co.indexOf(w); if(k>=0) sel.co.splice(k,1); else sel.co.push(w); }
+    else{ sel.wrk=w; }
+    wrkOpen=false; wrkAdd=false; drawChips(); return;
+  }
+  var rm=e.target.closest('[data-corm]');
+  if(rm){ var rw=db.workers[+rm.getAttribute('data-corm')]; sel.co=sel.co.filter(function(x){return x!==rw;}); drawChips(); return; }
+  if(e.target.closest('#coAdd')){ wrkAdd=true; wrkOpen=true; openGrp=null; drawChips(); return; }
+  if(e.target.closest('#wrkBtn')){ wrkAdd=false; wrkOpen=!wrkOpen; openGrp=null; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips(); }
 });
 /* Цэсний гадна дарах эсвэл Esc дарахад хаагдана */
 document.addEventListener('click',function(e){
@@ -1060,6 +1084,7 @@ $('saveBtn').addEventListener('click',function(){
     pay:split?SPLIT:payNow,date:$('date').value||dstr(now),time:$('time').value||tstr(now),note:$('note').value.trim(),
     dev:old?(old.dev||''):db.device,upd:Date.now(),sent:false};
   if(split) rec.split=split;
+  if(sel.wrk&&sel.co.length) rec.workers=[sel.wrk].concat(sel.co);
   var xs=sel.xOld||xSel();
   if(xs.length){ rec.extras=xs; rec.base=Math.max(0,rec.price-xSum(xs)); }
   if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); }
@@ -1098,7 +1123,7 @@ function startEdit(id){
   var r=db.records.filter(function(x){return x.id===id;})[0]; if(!r) return;
   editId=id; $('plate').value=r.plate; $('price').value=r.price; $('note').value=r.note||'';
   $('date').value=r.date; $('time').value=r.time;
-  sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.pay=r.own?PAYS[0]:(r.pay||PAYS[0]); sel.free=!!r.free; sel.own=!!r.own;
+  sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.co=wList(r).slice(1); sel.pay=r.own?PAYS[0]:(r.pay||PAYS[0]); sel.free=!!r.free; sel.own=!!r.own;
   clearSplit(); if(r.pay===SPLIT&&r.split) PAYS.forEach(function(p,i){ if(r.split[p]) $('spl'+i).value=r.split[p]; });
   sel.xs=[]; sel.xOld=null; sel.base=0;
   if(Array.isArray(r.extras)&&r.extras.length){
@@ -1128,7 +1153,7 @@ function drawList(){
   var shown=rows.slice(0,300);
   $('listBox').innerHTML=shown.length?shown.map(function(r){
     return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+(r.free?'<span class="tag">ҮНЭГҮЙ</span>':'')+(r.own?'<span class="tag own">ӨӨРИЙН</span>':'')+'</div>'+
-      '<div class="s">'+esc(r.service)+(r.extras&&r.extras.length?' + '+r.extras.map(function(x){return esc(x.n);}).join(', '):'')+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
+      '<div class="s">'+esc(r.service)+(r.extras&&r.extras.length?' + '+r.extras.map(function(x){return esc(x.n);}).join(', '):'')+(wList(r).length?' · '+esc(wList(r).join(' + ')):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
       '<div class="amt">'+money(r.price)+'<small>'+(q?esc(r.date)+' ':'')+esc(r.time)+' · '+esc(payLabel(r))+'</small></div></div>';
   }).join('')+(rows.length>shown.length?'<div class="empty">Эхний 300-г харууллаа</div>':'')
   :'<div class="empty">Бүртгэл алга</div>';
@@ -1225,25 +1250,31 @@ function drawReport(){
   var hasG=rows.some(function(r){return r.group;});
   $('byGrpCard').hidden=!hasG;
   if(hasG) $('byGrp').innerHTML=bars(group(rows.map(function(r){return {group:r.group||'Бүлэггүй',price:r.price};}),'group').sort(function(a,b){return b.sum-a.sum;}),tot);
-  $('byWrk').innerHTML=bars(by('worker'),tot);
+  var wm={},wl=[];
+  rows.forEach(function(r){ var l=wList(r); if(!l.length) l=['—']; l.forEach(function(w){ if(!wm[w]){wm[w]={k:w,n:0,sum:0};wl.push(wm[w]);} wm[w].n++; wm[w].sum+=(+r.price||0)/l.length; }); });
+  $('byWrk').innerHTML=bars(wl.sort(function(a,b){return b.sum-a.sum;}),tot);
   $('byDev').innerHTML=bars(by('dev'),tot);
   $('byDay').innerHTML=bars(days.sort(function(a,b){return b.k.localeCompare(a.k);}).slice(0,62),tot);
 }
 function drawSalary(rows){
   var m={},out=[];
+  var shared=0;
   rows.forEach(function(r){
-    if(!r.worker) return;
-    if(!m[r.worker]){m[r.worker]={w:r.worker,n:0,rev:0,pay:0};out.push(m[r.worker]);}
-    var x=m[r.worker]; x.n++; x.rev+=(+r.price||0); x.pay+=comm(r);
+    var l=wList(r); if(!l.length) return; if(l.length>1) shared++;
+    l.forEach(function(w){
+      if(!m[w]){m[w]={w:w,n:0,sh:0,rev:0,pay:0};out.push(m[w]);}
+      var x=m[w]; x.n++; if(l.length>1) x.sh++; x.rev+=(+r.price||0)/l.length; x.pay+=commFor(r,w);
+    });
   });
   if(!out.length){$('pay2Wrk').innerHTML='<div class="empty">Ажилтан сонгосон бүртгэл алга</div>';return;}
   out.sort(function(a,b){return b.pay-a.pay;});
   var tn=0,tr=0,tp=0;
   var html='<table class="tbl"><tr><th>Ажилтан</th><th>Машин</th><th>Орлого</th><th>Цалин</th></tr>'+
     out.map(function(x){tn+=x.n;tr+=x.rev;tp+=x.pay;
-      return '<tr><td>'+esc(x.w)+' <span style="color:var(--muted);font-size:12px">'+pctOf(x.w)+'%</span></td><td>'+x.n+'</td><td>'+money(x.rev)+'</td><td><b>'+money(x.pay)+'</b></td></tr>';}).join('')+
-    '<tr class="tot"><td>Нийт</td><td>'+tn+'</td><td>'+money(tr)+'</td><td>'+money(tp)+'</td></tr></table>';
-  var noW=rows.filter(function(r){return !r.worker;}).length;
+      return '<tr><td>'+esc(x.w)+' <span style="color:var(--muted);font-size:12px">'+pctOf(x.w)+'%</span></td><td>'+x.n+(x.sh?' <span style="color:var(--muted);font-size:12px">('+x.sh+' хамт)</span>':'')+'</td><td>'+money(x.rev)+'</td><td><b>'+money(x.pay)+'</b></td></tr>';}).join('')+
+    '<tr class="tot"><td>Нийт</td><td>'+(rows.filter(function(r){return wList(r).length;}).length)+'</td><td>'+money(tr)+'</td><td>'+money(tp)+'</td></tr></table>';
+  if(shared) html+='<div class="hint">'+shared+' машиныг хэд хэдэн ажилтан хамт угаасан. Үнийг тэнцүү хувааж, хүн бүрийн хувиар цалин бодсон.</div>';
+  var noW=rows.filter(function(r){return !wList(r).length;}).length;
   if(noW) html+='<div class="hint">'+noW+' бүртгэлд ажилтан сонгоогүй тул цалинд ороогүй.</div>';
   $('pay2Wrk').innerHTML=html;
 }
@@ -1372,7 +1403,7 @@ $('wrkSet').addEventListener('change',function(e){
   if(!t.hasAttribute('data-wn')) return;
   var i=+t.getAttribute('data-wn'), oldN=db.workers[i], nw=t.value.trim()||'Нэргүй';
   if(oldN in db.pct && !(nw in db.pct)){ db.pct[nw]=db.pct[oldN]; delete db.pct[oldN]; }
-  db.workers[i]=nw; sel.wrk=null; save(); drawChips();
+  db.workers[i]=nw; sel.wrk=null; sel.co=[]; save(); drawChips();
 });
 $('freePct').addEventListener('change',function(){db.freePct=this.checked;save();});
 $('loyOn').addEventListener('change',function(){db.loyOn=this.checked;save();drawSettings();drawPlateInfo();});
@@ -1384,7 +1415,7 @@ $('wrkSet').addEventListener('click',function(e){
   var b=e.target.closest('[data-wx]'); if(!b) return;
   var i=+b.getAttribute('data-wx');
   ask('"'+db.workers[i]+'" ажилтныг жагсаалтаас хасах уу? Өмнөх бүртгэл хэвээр үлдэнэ.','Хасах').then(function(ok){
-    if(!ok) return; db.workers.splice(i,1); sel.wrk=null; save(); drawSettings(); drawChips(); });
+    if(!ok) return; db.workers.splice(i,1); sel.wrk=null; sel.co=[]; save(); drawSettings(); drawChips(); });
 });
 $('xSet').addEventListener('change',function(e){
   var t=e.target;
@@ -1469,7 +1500,7 @@ $('expCsv').addEventListener('click',function(){
   if(!live().length){toast('Бүртгэл алга');return;}
   var rows=live().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
   var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Нэмэлт','Нэмэлтийн дүн','Үнэ','Урамшуулал','Ажилтан','Ажилтны цалин','Төлбөр','Бэлэн','Карт','Шилжүүлэг','Тэмдэглэл','Утас'].join(',')];
-  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,(r.extras||[]).map(function(x){return x.n;}).join('; '),xSum(r.extras),r.price,r.free?'Үнэгүй':(r.own?'Өөрийн машин':''),r.worker,Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
+  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,(r.extras||[]).map(function(x){return x.n;}).join('; '),xSum(r.extras),r.price,r.free?'Үнэгүй':(r.own?'Өөрийн машин':''),wList(r).join(' + '),Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
   download('ugaalga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
 });
 $('expJson').addEventListener('click',function(){
@@ -1561,7 +1592,7 @@ $('impFile').addEventListener('change',function(){
   var res={add:0,upd:0,del:0,bad:0,same:0,dup:0,dupList:[],set:false,cust:false}, had=live().length>0, i=0;
   (function next(){
     if(i>=files.length){
-      sel.wrk=null; save(); refreshAll(); drawChips(); inp.value='';
+      sel.wrk=null; sel.co=[]; save(); refreshAll(); drawChips(); inp.value='';
       var m=[res.add+' шинэ бүртгэл нэмэгдлээ'];
       if(res.upd) m.push(res.upd+' бүртгэл шинэчлэгдлээ');
       if(res.del) m.push(res.del+' бүртгэл устгагдлаа');
@@ -1943,7 +1974,7 @@ function applyInvite(d){
   if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
   if(d.ln>=2) db.loyN=Math.round(d.ln);
   if(typeof d.p==='string') db.pin=d.p;
-  sel.wrk=null;
+  sel.wrk=null; sel.co=[];
 }
 $('suJoinBtn').addEventListener('click',function(){
   var d=parseInvite($('suJoinIn').value);
@@ -2036,7 +2067,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-31e';
+  var APP_VER='2026-10-31f';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
