@@ -253,6 +253,9 @@ nav button.on{color:var(--brand);font-weight:700}
 .recv{font-size:14px;padding:var(--s2) 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:var(--s2)}
 .recv:last-child{border-bottom:0}
 .recv span:last-child{color:var(--muted);white-space:nowrap;font-size:13px}
+.tag.own{color:var(--brand);border-color:var(--brand)}
+.ownbox{margin-top:var(--s2)}
+.ownbox .chk{margin:0}
 .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
 #warn{display:none;background:var(--danger);color:#fff;padding:10px 16px;font-size:14px}
 body.worker .adm{display:none!important}
@@ -297,6 +300,7 @@ body.worker .rec{cursor:default}
     <div class="hint" id="plateHint"></div>
     <div class="notes" id="pNotes" role="note"></div>
     <div class="promo" id="promo"></div>
+    <div class="ownbox"><label class="chk"><input type="checkbox" id="ownOn"> Өөрийн машин (орлогогүй, ажилтны цалин бодно)</label></div>
 
     <label>Угаалгын төрөл</label>
     <div id="svcChips"></div>
@@ -312,6 +316,7 @@ body.worker .rec{cursor:default}
     <label>Угаасан ажилтан</label>
     <div id="wrkChips"></div>
 
+    <div id="payWrap">
     <label>Төлбөрийн хэлбэр</label>
     <div class="seg" id="payChips" role="radiogroup" aria-label="Төлбөрийн хэлбэр"></div>
     <div class="split" id="splitBox" hidden>
@@ -319,6 +324,7 @@ body.worker .rec{cursor:default}
       <div class="sr"><span>Карт</span><input id="spl1" type="number" inputmode="numeric" min="0" step="500" placeholder="0"><button type="button" data-fill="1">Үлдэгдэл</button></div>
       <div class="sr"><span>Шилжүүлэг</span><input id="spl2" type="number" inputmode="numeric" min="0" step="500" placeholder="0"><button type="button" data-fill="2">Үлдэгдэл</button></div>
       <div class="sl" id="splitLeft"></div>
+    </div>
     </div>
 
     <div class="row">
@@ -583,7 +589,7 @@ body.worker .rec{cursor:default}
 (function(){
 'use strict';
 var KEY='ugaalga_v1';
-var PAYS=['Бэлэн','Карт','Шилжүүлэг'], SPLIT='Хуваасан';
+var OWNPAY='Өөрийн', PAYS=['Бэлэн','Карт','Шилжүүлэг'], SPLIT='Хуваасан';
 var mem=null, storageOK=true;
 
 function defaults(){
@@ -704,7 +710,7 @@ function svcGroups(){var o=[],m={};db.services.forEach(function(x){var g=x.g||''
 
 /* ---------- цалин ---------- */
 function pctOf(w){var p=db.pct[w];return (typeof p==='number'&&p>=0)?p:DEF_PCT;}
-function commBase(r){return r.free?(db.freePct?(+r.list||0):0):(+r.price||0);}
+function commBase(r){if(r.own) return +r.list||0; return r.free?(db.freePct?(+r.list||0):0):(+r.price||0);}
 function comm(r){return r.worker?commBase(r)*pctOf(r.worker)/100:0;}
 
 /* ---------- байнгын үйлчлүүлэгч ---------- */
@@ -713,7 +719,7 @@ function visits(pk){
   var seen={},out=[];
   db.records.forEach(function(r){
     if(plateKey(r.plate)!==pk) return; seen[r.id]=1;
-    if(r.del||db.dupIds[r.id]) return;
+    if(r.del||db.dupIds[r.id]||r.own) return;
     out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service});
   });
   db.ext.forEach(function(e){
@@ -759,11 +765,12 @@ function loyalty(pk,exceptId){
 }
 
 /* ---------- add / edit form ---------- */
-var sel={svc:null,svcId:null,wrk:null,pay:PAYS[0],free:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false;
+var sel={svc:null,svcId:null,wrk:null,pay:PAYS[0],free:false,own:false,xOn:false,xs:[],xOld:null,base:0}, editId=null, openGrp=null, wrkOpen=false, svcOpen=false;
 
 /* Бүртгэлийн төлбөрийг хэлбэр бүрээр задлана: {Бэлэн:x, Карт:y, Шилжүүлэг:z} */
 function payParts(r){
   var o={};
+  if(r.own) return o;
   if(r.pay===SPLIT&&r.split&&typeof r.split==='object'){
     PAYS.forEach(function(p){ var v=+r.split[p]||0; if(v>0) o[p]=v; });
   }else{
@@ -772,6 +779,7 @@ function payParts(r){
   return o;
 }
 function payLabel(r){
+  if(r.own) return 'Орлогогүй';
   if(r.pay!==SPLIT) return r.pay||'';
   var o=payParts(r);
   return Object.keys(o).map(function(p){return p+' '+money(o[p]);}).join(' + ');
@@ -847,7 +855,8 @@ function resetForm(){
   $('plate').value=''; $('price').value=''; $('note').value='';
   $('date').value=dstr(now); $('time').value=tstr(now);
   sel.svc=null; sel.svcId=null; openGrp=null; wrkOpen=false; svcOpen=false; sel.pay=PAYS[0]; sel.free=false; clearSplit();
-  sel.xOn=false; sel.xs=[]; sel.xOld=null; sel.base=0; $('priceHint').hidden=true; drawExtras(); /* ажилтныг хэвээр үлдээнэ */
+  sel.xOn=false; sel.xs=[]; sel.xOld=null; sel.base=0; $('priceHint').hidden=true; drawExtras();
+  sel.own=false; drawOwn(); /* ажилтныг хэвээр үлдээнэ */
   $('plateHint').innerHTML=''; notesOpen=false; drawNotes(null); drawPromo(null);
   $('saveBtn').textContent='Хадгалах';
   $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
@@ -875,13 +884,25 @@ function xGroups(){ var o=[],m={}; db.extras.forEach(function(x){ if(x.g&&!m[x.g
 var openXGrp=null;
 function basePrice(){ var c=sel.svcId?svcById(sel.svcId):null; return c?(+c.price||0):(sel.base||0); }
 /* Үнэ = (үнэгүй бол 0, үгүй бол үндсэн үнэ) + сонгосон нэмэлтүүд */
+function drawOwn(){
+  $('ownOn').checked=sel.own; $('payWrap').hidden=sel.own;
+  if(sel.own){ $('promo').className='promo'; $('promo').innerHTML=''; }
+  var h=$('priceHint');
+  if(sel.own){ var v=parseFloat($('price').value)||0; h.hidden=false; h.textContent='Орлогод 0₮ орно. Ажилтны цалин '+money(v)+'-өөс бодогдоно.'; }
+}
+$('ownOn').addEventListener('change',function(){
+  sel.own=this.checked;
+  if(sel.own&&sel.free){ sel.free=false; }
+  recalcPrice(); drawOwn(); if(!sel.own) drawPlateInfo();
+});
+$('price').addEventListener('input',function(){ if(sel.own) drawOwn(); });
 function recalcPrice(){
   var xs=sel.xOld||xSel(), base=basePrice(), tot=(sel.free?0:base)+xSum(xs);
   if(sel.svcId||xs.length) $('price').value=tot;
   var h=$('priceHint');
   if(xs.length&&(sel.svcId||sel.base)){ h.hidden=false; h.textContent=(sel.free?'Үнэгүй угаалга':'Угаалга '+money(base))+' + нэмэлт '+money(xSum(xs)); }
   else h.hidden=true;
-  drawSplit();
+  drawSplit(); if(sel.own) drawOwn();
 }
 function drawExtras(){
   $('xOn').checked=sel.xOn;
@@ -984,6 +1005,7 @@ function drawPlateInfo(){
   drawPromo(L);
 }
 function drawPromo(L){
+  if(sel.own){ $('promo').className='promo'; $('promo').innerHTML=''; return; }
   var box=$('promo'), N=db.loyN;
   if(sel.free){
     box.className='promo on used';
@@ -1018,7 +1040,8 @@ $('saveBtn').addEventListener('click',function(){
   if(!sel.svc){toast('Угаалгын төрлөө сонгоно уу');return;}
   if(isNaN(price)||price<0){toast('Үнээ оруулна уу');$('price').focus();return;}
   var payNow=sel.pay, split=null;
-  if(payNow===SPLIT){
+  if(sel.own){ payNow=OWNPAY; }
+  else if(payNow===SPLIT){
     var effPrice=sel.free?0:price;
     if(effPrice<=0){ payNow=PAYS[0]; }
     else{
@@ -1039,6 +1062,7 @@ $('saveBtn').addEventListener('click',function(){
   var xs=sel.xOld||xSel();
   if(xs.length){ rec.extras=xs; rec.base=Math.max(0,rec.price-xSum(xs)); }
   if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); }
+  if(sel.own){ rec.own=true; rec.list=price; rec.price=0; delete rec.free; delete rec.split; if(rec.extras) rec.base=Math.max(0,price-xSum(rec.extras)); }
   if(!editId){
     var pk=plateKey(plate), m=mins(rec.time);
     var near=live().filter(function(r){return plateKey(r.plate)===pk&&r.date===rec.date&&Math.abs(mins(r.time)-m)<=15;})[0];
@@ -1073,7 +1097,7 @@ function startEdit(id){
   var r=db.records.filter(function(x){return x.id===id;})[0]; if(!r) return;
   editId=id; $('plate').value=r.plate; $('price').value=r.price; $('note').value=r.note||'';
   $('date').value=r.date; $('time').value=r.time;
-  sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.pay=r.pay||PAYS[0]; sel.free=!!r.free;
+  sel.svc=r.service; var es=svcByLabel(r.service); sel.svcId=es?es.id:null; openGrp=null; sel.wrk=r.worker||null; sel.pay=r.own?PAYS[0]:(r.pay||PAYS[0]); sel.free=!!r.free; sel.own=!!r.own;
   clearSplit(); if(r.pay===SPLIT&&r.split) PAYS.forEach(function(p,i){ if(r.split[p]) $('spl'+i).value=r.split[p]; });
   sel.xs=[]; sel.xOld=null; sel.base=0;
   if(Array.isArray(r.extras)&&r.extras.length){
@@ -1084,6 +1108,8 @@ function startEdit(id){
     sel.base=+r.base||0;
   }else sel.xOn=false;
   drawExtras(); $('priceHint').hidden=true;
+  if(r.own) $('price').value=+r.list||0;
+  drawOwn();
   $('saveBtn').textContent='Засварыг хадгалах';
   $('cancelEdit').style.display='block'; $('delBtn').style.display='block';
   drawPlateInfo(); drawChips(); show('add'); window.scrollTo(0,0);
@@ -1100,7 +1126,7 @@ function drawList(){
   $('listSum').textContent=rows.length+' машин · нийт '+money(tot)+(q?' (бүх өдрөөс хайсан)':'');
   var shown=rows.slice(0,300);
   $('listBox').innerHTML=shown.length?shown.map(function(r){
-    return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+(r.free?'<span class="tag">ҮНЭГҮЙ</span>':'')+'</div>'+
+    return '<div class="rec" data-id="'+esc(r.id)+'"><div><div class="p">'+esc(r.plate)+(r.free?'<span class="tag">ҮНЭГҮЙ</span>':'')+(r.own?'<span class="tag own">ӨӨРИЙН</span>':'')+'</div>'+
       '<div class="s">'+esc(r.service)+(r.extras&&r.extras.length?' + '+r.extras.map(function(x){return esc(x.n);}).join(', '):'')+(r.worker?' · '+esc(r.worker):'')+(r.note?' · '+esc(r.note):'')+(r.dev?' · '+esc(r.dev):'')+'</div></div>'+
       '<div class="amt">'+money(r.price)+'<small>'+(q?esc(r.date)+' ':'')+esc(r.time)+' · '+esc(payLabel(r))+'</small></div></div>';
   }).join('')+(rows.length>shown.length?'<div class="empty">Эхний 300-г харууллаа</div>':'')
@@ -1163,9 +1189,12 @@ function drawReport(){
   $('stats').innerHTML=
     '<div class="stat wide"><div class="k">Нийт орлого</div><div class="v">'+money(tot)+'</div></div>'+
     '<div class="stat"><div class="k">Угаасан машин</div><div class="v">'+rows.length+'</div></div>'+
-    '<div class="stat"><div class="k">Дундаж үнэ</div><div class="v">'+money(rows.length?tot/rows.length:0)+'</div></div>'+
+    (function(){var n=rows.filter(function(r){return !r.own;}).length; return '<div class="stat"><div class="k">Дундаж үнэ</div><div class="v">'+money(n?tot/n:0)+'</div></div>';})()+
     '<div class="stat"><div class="k">Давхардаагүй машин</div><div class="v">'+Object.keys(uniq).length+'</div></div>'+
     '<div class="stat"><div class="k">Өдрийн дундаж орлого</div><div class="v">'+money(days.length?tot/days.length:0)+'</div></div>'+
+    (function(){var o=rows.filter(function(r){return r.own;}); return o.length?
+      '<div class="stat wide"><div class="k">Өөрийн машин (орлогогүй)</div><div class="v">'+o.length+
+      ' <span style="font-size:14px;font-weight:400;color:var(--muted)">· цалинд '+money(o.reduce(function(a,r){return a+comm(r);},0))+'</span></div></div>':'';})()+
     (function(){var f=rows.filter(function(r){return r.free;}); return f.length?
       '<div class="stat wide"><div class="k">Урамшууллын үнэгүй угаалга</div><div class="v">'+f.length+
       ' <span style="font-size:14px;font-weight:400;color:var(--muted)">· '+money(f.reduce(function(s,r){return s+(+r.list||0);},0))+'-ийн үнэ</span></div></div>':'';})();
@@ -1439,7 +1468,7 @@ $('expCsv').addEventListener('click',function(){
   if(!live().length){toast('Бүртгэл алга');return;}
   var rows=live().sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
   var out=[['Огноо','Цаг','Улсын дугаар','Угаалгын төрөл','Нэмэлт','Нэмэлтийн дүн','Үнэ','Урамшуулал','Ажилтан','Ажилтны цалин','Төлбөр','Бэлэн','Карт','Шилжүүлэг','Тэмдэглэл','Утас'].join(',')];
-  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,(r.extras||[]).map(function(x){return x.n;}).join('; '),xSum(r.extras),r.price,r.free?'Үнэгүй':'',r.worker,Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
+  rows.forEach(function(r){out.push([r.date,r.time,r.plate,r.service,(r.extras||[]).map(function(x){return x.n;}).join('; '),xSum(r.extras),r.price,r.free?'Үнэгүй':(r.own?'Өөрийн машин':''),r.worker,Math.round(comm(r)),r.pay,(function(){var o=payParts(r);return o['Бэлэн']||0;})(),payParts(r)['Карт']||0,payParts(r)['Шилжүүлэг']||0,r.note,r.dev||''].map(csvCell).join(','));});
   download('ugaalga-'+dstr(new Date())+'.csv','\ufeff'+out.join('\r\n'),'text/csv;charset=utf-8');
 });
 $('expJson').addEventListener('click',function(){
@@ -2006,7 +2035,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-31b';
+  var APP_VER='2026-10-31c';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
