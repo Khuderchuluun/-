@@ -255,8 +255,8 @@ nav button.on{color:var(--brand);font-weight:700}
 .recv span:last-child{color:var(--muted);white-space:nowrap;font-size:13px}
 .tag.own{color:var(--brand);border-color:var(--brand)}
 .ownbox{margin-top:var(--s2)}
-.ownbox .chk{margin:0;font-size:11px;color:var(--muted);gap:var(--s1)}
-.ownbox .chk input{width:14px;height:14px}
+.ownbox .chk{margin:0;font-size:8px;color:var(--muted);gap:var(--s1);padding:var(--s1) 0}
+.ownbox .chk input{width:8px;height:8px}
 .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
 #warn{display:none;background:var(--danger);color:#fff;padding:10px 16px;font-size:14px}
 body.worker .adm{display:none!important}
@@ -2036,7 +2036,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-31d';
+  var APP_VER='2026-10-31e';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
