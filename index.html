@@ -191,7 +191,12 @@ h2{font-size:15px;margin:0 0 var(--s2)}
 .exrow{display:flex;align-items:center;gap:var(--s2)}
 .exrow .rec{flex:1;min-width:0}
 .exrow .x{flex:none;min-width:40px;min-height:40px;font-size:16px}
-.exsum{display:flex;justify-content:space-between;align-items:baseline;gap:var(--s2);margin-top:var(--s3);font-weight:700;font-variant-numeric:tabular-nums}
+.exsum{display:grid;grid-template-columns:1fr auto auto;column-gap:var(--s4);row-gap:2px;align-items:baseline;margin-top:var(--s3);font-variant-numeric:tabular-nums}
+.exsum .h{font-size:12px;color:var(--muted);font-weight:600}
+.exsum .h.n,.exsum .n{text-align:right}
+.exsum b{font-weight:700}
+.rng{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.rng > div{min-width:0}
 .stat .v.neg{color:var(--danger)}
 .sgrp{border:1px solid var(--line);border-radius:12px;padding:var(--s3);margin-bottom:var(--s3)}
 .sgrp .gl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin:0 0 var(--s2)}
@@ -353,7 +358,21 @@ body.worker .rec{cursor:default}
       <option value="month">Энэ сар</option>
       <option value="pmonth">Өмнөх сар</option>
       <option value="all">Бүх хугацаа</option>
+      <option value="day">Өдөр сонгох…</option>
+      <option value="mon">Сар сонгох…</option>
+      <option value="custom">Хугацаа сонгох (цагтай)…</option>
     </select>
+    <div id="rpDay" hidden><label for="rpDayIn">Өдөр</label><input id="rpDayIn" type="date"></div>
+    <div id="rpMon" hidden><label for="rpMonIn">Сар</label><input id="rpMonIn" type="month"></div>
+    <div id="rpCus" hidden>
+      <div class="rng">
+        <div><label for="rpFromD">Эхлэх өдөр</label><input id="rpFromD" type="date"></div>
+        <div><label for="rpFromT">Цаг (заавал биш)</label><input id="rpFromT" type="time"></div>
+        <div><label for="rpToD">Дуусах өдөр</label><input id="rpToD" type="date"></div>
+        <div><label for="rpToT">Цаг (заавал биш)</label><input id="rpToT" type="time"></div>
+      </div>
+    </div>
+    <div class="hint" id="rpInfo"></div>
   </div>
   <div class="stats" id="stats"></div>
   <div class="card"><h2>Төлбөрийн хэлбэрээр</h2><div id="byPay"></div></div>
@@ -1103,6 +1122,22 @@ function range(p){
   if(p==='pmonth') return [dstr(new Date(now.getFullYear(),now.getMonth()-1,1)),dstr(new Date(now.getFullYear(),now.getMonth(),0))];
   return ['0000-00-00','9999-99-99'];
 }
+/* Тайлангийн хугацаа: [эхлэх огноо-цаг, дуусах огноо-цаг] */
+function repSpan(){
+  var p=$('period').value, now=new Date();
+  if(p==='day'){ var d=$('rpDayIn').value||dstr(now); return [d+' 00:00',d+' 23:59']; }
+  if(p==='mon'){
+    var m=$('rpMonIn').value||dstr(now).slice(0,7), y=+m.slice(0,4), mo=+m.slice(5,7);
+    return [m+'-01 00:00',dstr(new Date(y,mo,0))+' 23:59'];
+  }
+  if(p==='custom'){
+    var fd=$('rpFromD').value||dstr(now), td=$('rpToD').value||fd;
+    var a=fd+' '+($('rpFromT').value||'00:00'), b=td+' '+($('rpToT').value||'23:59');
+    return a<=b?[a,b]:[b,a];
+  }
+  var rg=range(p); return [rg[0]+' 00:00',rg[1]+' 23:59'];
+}
+function inSpan(sp,d,t){ var x=(d||'')+' '+(t||'00:00'); return x>=sp[0]&&x<=sp[1]; }
 function group(rows,key){
   var m={},out=[];
   rows.forEach(function(r){var k=r[key]||'—'; if(!m[k]){m[k]={k:k,n:0,sum:0};out.push(m[k]);} m[k].n++; m[k].sum+=(+r.price||0);});
@@ -1118,8 +1153,10 @@ function bars(list,total){
   }).join('');
 }
 function drawReport(){
-  var rg=range($('period').value);
-  var rows=live().filter(function(r){return r.date>=rg[0]&&r.date<=rg[1];});
+  var sp=repSpan(), p=$('period').value;
+  $('rpDay').hidden=p!=='day'; $('rpMon').hidden=p!=='mon'; $('rpCus').hidden=p!=='custom';
+  $('rpInfo').textContent=(p==='all')?'':(sp[0].slice(0,10)===sp[1].slice(0,10)?sp[0].slice(0,10)+(p==='custom'?' · '+sp[0].slice(11)+'–'+sp[1].slice(11):''):sp[0].slice(0,10)+' – '+sp[1].slice(0,10))+(p==='custom'&&sp[0].slice(0,10)!==sp[1].slice(0,10)?' ('+sp[0].slice(11)+' – '+sp[1].slice(11)+')':'');
+  var rows=live().filter(function(r){return inSpan(sp,r.date,r.time);});
   var tot=rows.reduce(function(s,r){return s+(+r.price||0);},0);
   var days=group(rows,'date');
   var uniq={}; rows.forEach(function(r){uniq[plateKey(r.plate)]=1;});
@@ -1132,7 +1169,7 @@ function drawReport(){
     (function(){var f=rows.filter(function(r){return r.free;}); return f.length?
       '<div class="stat wide"><div class="k">Урамшууллын үнэгүй угаалга</div><div class="v">'+f.length+
       ' <span style="font-size:14px;font-weight:400;color:var(--muted)">· '+money(f.reduce(function(s,r){return s+(+r.list||0);},0))+'-ийн үнэ</span></div></div>':'';})();
-  var exRows=liveEx().filter(function(e){return e.date>=rg[0]&&e.date<=rg[1];});
+  var exRows=liveEx().filter(function(e){return inSpan(sp,e.date,e.time);});
   var exTot=exRows.reduce(function(a,e){return a+(+e.amt||0);},0), salTot=rows.reduce(function(a,r){return a+comm(r);},0), net=tot-exTot-salTot;
   $('stats').innerHTML+=
     '<div class="stat"><div class="k">Зарлага</div><div class="v">'+money(exTot)+'</div></div>'+
@@ -1190,6 +1227,7 @@ function drawTopCust(rows){
     :'<div class="empty">Энэ хугацаанд 2-оос дээш удаа ирсэн машин алга</div>';
 }
 $('period').addEventListener('change',drawReport);
+['rpDayIn','rpMonIn','rpFromD','rpFromT','rpToD','rpToT'].forEach(function(id){ $(id).addEventListener('change',drawReport); });
 
 /* ---------- settings ---------- */
 function drawXSet(){
@@ -1670,7 +1708,10 @@ function drawExList(){
   var rg=range($('exPeriod').value);
   var rows=liveEx().filter(function(e){return e.date>=rg[0]&&e.date<=rg[1];}).sort(function(a,b){return dt(b.date,b.time).localeCompare(dt(a.date,a.time));});
   var tot=rows.reduce(function(a,e){return a+(+e.amt||0);},0);
-  $('exByCat').innerHTML=rows.length?'<div class="exsum"><span>Нийт '+rows.length+' зарлага</span><span>'+money(tot)+'</span></div>'+bars(exByCat(rows),tot):'';
+  var cars=live().filter(function(r){return r.date>=rg[0]&&r.date<=rg[1];}).length;
+  $('exByCat').innerHTML=rows.length?'<div class="exsum"><span class="h">Зарлага</span><span class="h n">Угаасан машин</span><span class="h n">Зарцуулсан</span>'+
+    '<b>Нийт '+rows.length+' зарлага</b><b class="n">'+cars+'</b><b class="n">'+money(tot)+'</b></div>'+
+    (cars?'<div class="hint">1 машинд ногдох зарлага ~'+money(tot/cars)+'</div>':'')+bars(exByCat(rows),tot):'';
   $('exList').innerHTML=rows.length?'<div class="hint" style="margin:12px 0 0">Мөр дээр дарж засна, × дарж устгана.</div><div>'+rows.slice(0,300).map(function(e){
     return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+(qtyTxt(e)?' <span style="font-weight:400;color:var(--muted)">· '+esc(qtyTxt(e))+'</span>':'')+'</div>'+
       '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>'+
@@ -1947,12 +1988,13 @@ window.addEventListener('hashchange',checkJoinHash);
 
 var now=new Date();
 $('fDate').value=dstr(now);
+(function(){ var n=new Date(), d=dstr(n); $('rpDayIn').value=d; $('rpMonIn').value=d.slice(0,7); $('rpFromD').value=d; $('rpToD').value=d; })();
 resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 })();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-10-29m';
+  var APP_VER='2026-10-31';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
