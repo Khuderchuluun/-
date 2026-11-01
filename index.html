@@ -415,6 +415,11 @@ body.worker .rec{cursor:default}
     <div id="exQtyBox" hidden>
       <label for="exQty">Хэмжээ</label>
       <div class="qrow"><input id="exQty" type="number" inputmode="decimal" min="0" step="any" placeholder="0"><span class="un" id="exUnit"></span></div>
+      <div id="exLeftBox" hidden>
+        <label for="exLeft">Өмнөхөөс үлдсэн (заавал биш)</label>
+        <div class="qrow"><input id="exLeft" type="number" inputmode="decimal" min="0" step="any" placeholder="0"><span class="un" id="exUnit2"></span></div>
+      </div>
+      <div class="notes on" id="exCalc" style="display:none"></div>
     </div>
     <div class="row">
       <div><label for="exDate">Огноо</label><input id="exDate" type="date"></div>
@@ -1721,7 +1726,11 @@ function exCycles(catId){
   var done=[];
   for(var i=0;i<fills.length-1;i++){
     var a=dt(fills[i].date,fills[i].time), b=dt(fills[i+1].date,fills[i+1].time), n=cnt(a,b);
-    done.push({n:n,amt:+fills[i].amt||0,q:+fills[i].qty||0});
+    var eff=(+fills[i].qty||0)+(+fills[i].left||0), nl=+fills[i+1].left||0;
+    var uq=fills[i].qty>0?Math.max(0,eff-nl):0, am=+fills[i].amt||0;
+    /* Үлдэгдэл бүртгэгдсэн бол зөвхөн зарцуулсан хэсгийн үнийг тооцно */
+    if(nl>0&&fills[i].qty>0) am=am*Math.min(1,uq/(+fills[i].qty));
+    done.push({n:n,amt:am,q:uq});
   }
   var last=fills[fills.length-1], cur=cnt(dt(last.date,last.time),null);
   var useful=done.filter(function(c){return c.n>0;}).slice(-5);
@@ -1732,7 +1741,7 @@ function exCycles(catId){
   var byQty=useful.length&&useful.every(function(c){return c.q>0;})&&(+last.qty>0), cpu=0, qpc=0;
   if(byQty){
     var sumQ=useful.reduce(function(a,c){return a+c.q;},0);
-    cpu=sumN/sumQ; qpc=sumQ/sumN; avg=Math.round(cpu*(+last.qty));
+    cpu=sumN/sumQ; qpc=sumQ/sumN; avg=Math.round(cpu*((+last.qty)+(+last.left||0)));
   }
   return {last:last,cur:cur,avg:avg,cpc:cpc,k:useful.length,byQty:byQty,cpu:cpu,qpc:qpc};
 }
@@ -1754,44 +1763,50 @@ function drawTrack(){
     if(!y) return '<div class="trk"><div class="th"><span class="tn">'+esc(c.name)+'</span></div><div class="hint">Нөхсөн үедээ энд зарлага бүртгэнэ үү.</div></div>';
     var head='<div class="th"><span class="tn">'+esc(c.name)+'</span><span class="tv">'+y.cur+' <small>машин</small></span></div>'+
       '<div class="hint">Сүүлд нөхсөн: '+esc(y.last.date)+' '+esc(y.last.time||'')+(qtyTxt(y.last)?' · '+esc(qtyTxt(y.last)):'')+' · '+money(y.last.amt)+'</div>';
-    /* Үлдэгдэл тоолсон бол: зарцуулсан хэмжээ ба тэр хооронд угаасан машинаар тооцно */
-    var u=y.last.unit||c.unit||'', fq=+y.last.qty||0, fillAt=dt(y.last.date,y.last.time), sk=null;
-    if(fq>0){
-      var ch=db.stock.filter(function(k){return k.cat===c.id&&dt(k.date,k.time)>=fillAt;}).sort(function(a,b){return dt(a.date,a.time).localeCompare(dt(b.date,b.time));}).pop();
-      if(ch){
-        var cars=live().map(function(r){return dt(r.date,r.time);}), ca=dt(ch.date,ch.time);
-        var usedCars=cars.filter(function(x){return x>=fillAt&&x<ca;}).length, since=cars.filter(function(x){return x>=ca;}).length, used=fq-ch.left;
-        sk={ch:ch,used:used,usedCars:usedCars,since:since};
-        if(used>0&&usedCars>0){ sk.rate=usedCars/used; sk.cap=Math.round(ch.left*sk.rate); y.avg=usedCars+sk.cap; }
-      }
-    }
-    var stkUi=fq>0?'<div class="stk"><input id="stk_'+esc(c.id)+'" type="number" inputmode="decimal" min="0" step="any" placeholder="Одоо үлдсэн хэмжээ"><span class="un">'+esc(u)+'</span><button type="button" data-stk="'+esc(c.id)+'">Тоолох</button></div>':'';
-    var skTxt='';
-    if(sk){
-      var when=esc(sk.ch.date.slice(5))+' '+esc(sk.ch.time||'');
-      skTxt='<div class="sk"><b>'+num(fq)+' '+esc(u)+'-аас '+num(sk.ch.left)+' '+esc(u)+' үлдсэн</b> <span style="color:var(--muted)">('+when+' тоолсон)</span></div>';
-      if(sk.rate) skTxt+='<div class="hint">'+num(sk.used)+' '+esc(u)+'-аар '+sk.usedCars+' машин угаасан · 1 '+esc(u)+' ≈ '+num(sk.rate)+' машин · үлдсэн '+num(sk.ch.left)+' '+esc(u)+' ≈ '+sk.cap+' машинд хүрнэ'+(sk.since?' (тоолсноос хойш '+sk.since+' угаасан)':'')+'</div>';
-      else if(sk.used<=0) skTxt+='<div class="hint">Зарцуулсан хэмжээ 0 тул тооцоолох боломжгүй.</div>';
-      else skTxt+='<div class="hint">Нөхсөнөөс хойш тоолох хүртэл машин угаагаагүй тул тооцоолох боломжгүй.</div>';
-    }
-    if(!y.avg) return '<div class="trk">'+head+skTxt+'<div class="tl">'+(fq>0?'Үлдэгдлээ тоолж оруулбал хэдэн машинд хүрэхийг тооцоолно.':'Дараагийн удаа нөхөхөд нэг удаагийн нөөц хэдэн машинд хүрдгийг тооцоолж эхэлнэ.')+'</div>'+stkUi+'</div>';
+    if(!y.avg) return '<div class="trk">'+head+'<div class="tl">Дараагийн удаа нөхөж бүртгэхэд хэдэн машинд хүрдгийг тооцоолж эхэлнэ.</div></div>';
     var left=y.avg-y.cur, warn=left<=Math.max(1,Math.round(y.avg*0.1)), pct=Math.min(100,Math.round(y.cur/y.avg*100));
     return '<div class="trk'+(warn?' warn':'')+'">'+head+'<div class="g"><i style="width:'+Math.max(2,pct)+'%"></i></div>'+
-      '<div class="tl">'+(left>0?'Ойролцоогоор '+left+' машины дараа дуусна':'Дундаж хэмжээнд хүрсэн. Удахгүй дуусах магадлалтай.')+'</div>'+skTxt+
-      (sk&&sk.rate?'':y.byQty?(function(){
+      '<div class="tl">'+(left>0?'Ойролцоогоор '+left+' машины дараа дуусна':'Дундаж хэмжээнд хүрсэн. Удахгүй дуусах магадлалтай.')+'</div>'+
+      (y.byQty?(function(){
         var u=y.last.unit||c.unit||'', per=(u==='тн')?' · 1 машинд ~'+Math.round(y.qpc*1000)+' л':(u?' · 1 машинд ~'+num(y.qpc)+' '+esc(u):'');
         return '<div class="hint">1 '+esc(u||'нэгж')+' дунджаар '+num(y.cpu)+' машинд хүрдэг'+per+' · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div>'+
-          '<div class="hint">Одоогийн '+esc(qtyTxt(y.last))+' ойролцоогоор '+y.avg+' машинд хүрнэ</div>';
-      })():'<div class="hint">Нэг удаагийн нөөц дунджаар '+y.avg+' машинд хүрдэг · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div>')+stkUi+'</div>';
+          '<div class="hint">Одоогийн '+num((+y.last.qty)+(+y.last.left||0))+' '+esc(u)+(y.last.left>0?' ('+num(y.last.qty)+' + өмнөхөөс '+num(y.last.left)+')':'')+' ойролцоогоор '+y.avg+' машинд хүрнэ</div>';
+      })():'<div class="hint">Нэг удаагийн нөөц дунджаар '+y.avg+' машинд хүрдэг · 1 машинд ~'+money(y.cpc)+' (сүүлийн '+y.k+' удаагаар)</div>')+'</div>';
   }).join('');
 }
-$('trkBox').addEventListener('click',function(e){
-  var b=e.target.closest('[data-stk]'); if(!b) return;
-  var id=b.getAttribute('data-stk'), inp=$('stk_'+id), v=parseFloat(String(inp&&inp.value||'').replace(',','.'));
-  if(isNaN(v)||v<0){ toast('Үлдсэн хэмжээгээ оруулна уу'); if(inp) inp.focus(); return; }
-  var n=new Date(); db.stock.push({id:uid(),cat:id,left:v,date:dstr(n),time:tstr(n),dev:db.device});
-  save(); drawTrack(); toast('Үлдэгдэл хадгалагдлаа');
-});
+function prevFill(catId,at,excl){
+  return liveEx().filter(function(e){return e.cat===catId&&e.id!==excl&&dt(e.date,e.time)<at;})
+    .sort(function(a,b){return dt(a.date,a.time).localeCompare(dt(b.date,b.time));}).pop()||null;
+}
+/* Өмнөх нөхөлтөөс энэ бүртгэл хүртэлх зарцуулалт: хэдэн машин, хэдэн нэгж */
+function fillCalc(catId,at,left,excl){
+  var p=prevFill(catId,at,excl); if(!p) return null;
+  var from=dt(p.date,p.time), n=live().filter(function(r){var x=dt(r.date,r.time);return x>=from&&x<at;}).length;
+  var eff=(+p.qty||0)+(+p.left||0), r={prev:p,n:n,eff:eff};
+  if(eff>0&&left>=0&&left!==null){ r.used=eff-left; if(r.used>0&&n>0) r.rate=n/r.used; }
+  return r;
+}
+function calcHtml(c,k,left){
+  var u=c.unit||'', p=k.prev, s='<div class="nt">Өмнөх нөхөлтөөс хойш</div>';
+  s+='<div class="ni">'+k.n+' машин угаасан <small>'+esc(p.date)+' '+esc(p.time||'')+(k.eff>0?' · '+num(k.eff)+' '+esc(u)+(p.left>0?' (үлдэгдэл '+num(p.left)+' орсон)':''):'')+'</small></div>';
+  if(k.used!==undefined){
+    if(k.used<=0) s+='<div class="ni">Үлдэгдэл өмнөх хэмжээнээс их байна. Шалгана уу.</div>';
+    else s+='<div class="ni"><b>'+num(k.used)+' '+esc(u)+'-аар '+k.n+' машин</b>'+(k.rate?' · 1 '+esc(u)+' ≈ '+num(k.rate)+' машин':'')+
+      (k.rate&&left>0?'<small>Үлдсэн '+num(left)+' '+esc(u)+' ≈ '+Math.round(left*k.rate)+' машинд хүрнэ</small>':'')+'</div>';
+  }else if(k.eff>0) s+='<div class="ni"><small>Өмнөхөөс үлдсэнийг оруулбал 1 '+esc(u)+' хэдэн машинд хүрснийг тооцоолно.</small></div>';
+  return s;
+}
+function drawExCalc(){
+  var c=exSel&&exCat(exSel), box=$('exCalc'), lb=$('exLeftBox');
+  if(!(c&&c.track)){ box.style.display='none'; lb.hidden=true; return; }
+  var at=dt($('exDate').value||dstr(new Date()),$('exTime').value||'23:59');
+  var lv=parseFloat(String($('exLeft').value).replace(',','.')); if(isNaN(lv)) lv=null;
+  var k=fillCalc(c.id,at,lv,exEdit);
+  lb.hidden=!(k&&k.eff>0&&c.unit); $('exUnit2').textContent=c.unit||'';
+  if(!k){ box.style.display='none'; return; }
+  box.style.display='block'; box.innerHTML=calcHtml(c,k,lv);
+}
+['exLeft','exDate','exTime'].forEach(function(id){ $(id).addEventListener('input',drawExCalc); $(id).addEventListener('change',drawExCalc); });
 function drawExCats(){
   $('exCats').innerHTML=db.expCats.map(function(c){
     var on=exSel===c.id;
@@ -1799,12 +1814,13 @@ function drawExCats(){
   }).join('')||'<div class="hint">Тохиргооноос ангилал нэмнэ үү.</div>';
   var c=exSel&&exCat(exSel), h=$('exHint');
   $('exQtyBox').hidden=!(c&&c.unit); $('exUnit').textContent=c&&c.unit?c.unit:'';
+  drawExCalc();
   if(c&&c.track&&!exEdit){ h.hidden=false; h.textContent='Огноо, цагийг яг нөхсөн үеэр нь оруулаарай. Түүнээс хойш угаасан машин энэ нөөцөд тоологдоно.'; }
   else h.hidden=true;
 }
 function exReset(){
   exEdit=null; exSel=null; var now=new Date();
-  $('exAmt').value=''; $('exNote').value=''; $('exQty').value=''; $('exDate').value=dstr(now); $('exTime').value=tstr(now);
+  $('exAmt').value=''; $('exNote').value=''; $('exQty').value=''; $('exLeft').value=''; $('exDate').value=dstr(now); $('exTime').value=tstr(now);
   $('exTitle').textContent='Зарлага бүртгэх'; $('exSave').textContent='Хадгалах';
   $('exCancel').hidden=true; $('exDel').hidden=true; drawExCats();
 }
@@ -1819,6 +1835,7 @@ function drawExList(){
   var ecars=exCarsById();
   $('exList').innerHTML=rows.length?'<div class="hint" style="margin:12px 0 0">Мөр дээр дарж засна, × дарж устгана.</div><div>'+rows.slice(0,300).map(function(e){
     return '<div class="exrow" style="border-bottom:1px solid var(--line)"><div class="rec" style="border-bottom:0" data-exid="'+esc(e.id)+'"><div><div class="p" style="font-size:15px">'+esc(exCatName(e))+(qtyTxt(e)?' <span style="font-weight:400;color:var(--muted)">· '+esc(qtyTxt(e))+'</span>':'')+
+        (e.left>0?' <span style="font-weight:400;color:var(--muted)">(+ өмнөхөөс '+num(e.left)+')</span>':'')+
         (ecars[e.id]?' <span style="font-weight:400;color:var(--muted)">· машин '+ecars[e.id].n+(ecars[e.id].cur?' (одоо хүртэл)':'')+'</span>':'')+'</div>'+
       '<div class="s">'+esc(e.date)+' '+esc(e.time||'')+(e.note?' · '+esc(e.note):'')+'</div></div><div class="amt">'+money(e.amt)+'</div></div>'+
       '<button type="button" class="x" data-exdel="'+esc(e.id)+'" aria-label="'+esc(exCatName(e))+' '+money(e.amt)+' зарлагыг устгах">×</button></div>';
@@ -1841,6 +1858,8 @@ $('exSave').addEventListener('click',function(){
     note:$('exNote').value.trim(),dev:db.device,upd:Date.now()};
   var q=parseFloat(String($('exQty').value).replace(',','.'));
   if(c&&c.unit&&q>0){ e.qty=q; e.unit=c.unit; }
+  var lf=parseFloat(String($('exLeft').value).replace(',','.'));
+  if(c&&c.track&&!$('exLeftBox').hidden&&lf>=0&&String($('exLeft').value).trim()!=='') e.left=lf;
   if(exEdit){ for(var i=0;i<db.expenses.length;i++) if(db.expenses[i].id===exEdit){ db.expenses[i]=e; break; } toast('Засвар хадгалагдлаа'); }
   else{ db.expenses.push(e); toast('Хадгаллаа: '+e.catName+' · '+money(amt)); }
   save(); exReset(); drawTrack(); drawExList();
@@ -1858,7 +1877,7 @@ $('exList').addEventListener('click',function(ev){
   var d=ev.target.closest('[data-exdel]'); if(d){ exRemove(d.getAttribute('data-exdel')); return; }
   var r=ev.target.closest('[data-exid]'); if(!r) return;
   var e=db.expenses.filter(function(x){return x.id===r.getAttribute('data-exid');})[0]; if(!e) return;
-  exEdit=e.id; exSel=e.cat; $('exAmt').value=e.amt; $('exQty').value=e.qty>0?e.qty:''; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
+  exEdit=e.id; exSel=e.cat; $('exLeft').value=e.left>=0&&e.left!==undefined?e.left:''; $('exAmt').value=e.amt; $('exQty').value=e.qty>0?e.qty:''; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
   $('exTitle').textContent='Зарлага засах'; $('exSave').textContent='Засварыг хадгалах';
   $('exCancel').hidden=false; $('exDel').hidden=false; drawExCats(); window.scrollTo(0,0);
 });
@@ -2100,7 +2119,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-01';
+  var APP_VER='2026-11-01b';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
