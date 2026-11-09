@@ -348,6 +348,7 @@ body.worker .rec{cursor:default}
     <input id="note" autocomplete="off" placeholder="">
 
     <button class="btn" id="saveBtn">Хадгалах</button>
+    <button class="btn ghost" id="clearForm">Цэвэрлэх</button>
     <button class="btn ghost" id="cancelEdit" style="display:none">Засварыг болих</button>
     <button class="btn red" id="delBtn" style="display:none">Энэ бүртгэлийг устгах</button>
   </div>
@@ -432,6 +433,7 @@ body.worker .rec{cursor:default}
     <input id="exNote" autocomplete="off" placeholder="Жишээ: 5 тонн ус, 2 шуудай нүүрс">
     <div class="hint" id="exHint" hidden></div>
     <button class="btn" id="exSave">Хадгалах</button>
+    <button class="btn ghost" id="exClear">Цэвэрлэх</button>
     <button class="btn ghost" id="exCancel" hidden>Засварыг болих</button>
     <button class="btn red" id="exDel" hidden>Энэ зарлагыг устгах</button>
   </div>
@@ -891,7 +893,7 @@ function resetForm(){
   sel.wrk=null; sel.co=[]; wrkAdd=false; /* шинэ бүртгэл бүр хоосон эхэлнэ */
   $('plateHint').innerHTML=''; notesOpen=false; drawNotes(null); drawPromo(null);
   $('saveBtn').textContent='Хадгалах';
-  $('cancelEdit').style.display='none'; $('delBtn').style.display='none';
+  $('cancelEdit').style.display='none'; $('delBtn').style.display='none'; $('clearForm').hidden=false;
   drawChips();
 }
 $('svcChips').addEventListener('click',function(e){
@@ -1152,7 +1154,7 @@ function startEdit(id){
   if(r.own) $('price').value=+r.list||0;
   drawOwn();
   $('saveBtn').textContent='Засварыг хадгалах';
-  $('cancelEdit').style.display='block'; $('delBtn').style.display='block';
+  $('cancelEdit').style.display='block'; $('delBtn').style.display='block'; $('clearForm').hidden=true;
   drawPlateInfo(); drawChips(); show('add'); window.scrollTo(0,0);
 }
 
@@ -1705,10 +1707,22 @@ function show(p){
 }
 document.querySelector('nav').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b) return;
-  if(editId&&b.getAttribute('data-p')!=='add') resetForm();
-  if(exEdit&&b.getAttribute('data-p')!=='exp') exReset();
+  /* Засвар хийж байхдаа аль ч цэс дарвал (Бүртгэх өөрөө ч) шинэ хоосон форм руу буцна */
+  if(editId) resetForm();
+  if(exEdit) exReset();
   show(b.getAttribute('data-p'));
 });
+$('clearForm').addEventListener('click',function(){ resetForm(); window.scrollTo(0,0); toast('Форм цэвэрлэгдлээ'); });
+/* Утасны хөтөч өмнө бичсэн утгыг санал болгохгүй байх: нэр бүрийг санамсаргүй болгож, автоматаар бөглөхийг унтраана */
+(function(){
+  var ids=['plate','price','note','spl0','spl1','spl2','exAmt','exQty','exLeft','exNote','suJName','suJoinIn','fPlate'];
+  ids.forEach(function(id){ var el=$(id); if(!el) return;
+    el.setAttribute('autocomplete','off'); el.setAttribute('autocorrect','off'); el.setAttribute('spellcheck','false');
+    el.setAttribute('name','f'+Math.random().toString(36).slice(2,9)); el.setAttribute('data-lpignore','true'); el.setAttribute('data-form-type','other');
+  });
+})();
+/* Хөтөч хуудсыг кэшээс сэргээхэд (буцах, апп руу дахин орох) хуучин бичсэн утгууд гарч ирэхгүй байх */
+window.addEventListener('pageshow',function(e){ if(e.persisted){ if(!editId) resetForm(); if(!exEdit) exReset(); } });
 /* ---------- зарлага ---------- */
 var exSel=null, exEdit=null, EXPAYS=['Бэлэн','Дансаар'], exPaySel='Бэлэн';
 function liveEx(){ return db.expenses.filter(function(e){return !e.del;}); }
@@ -1835,7 +1849,7 @@ function exReset(){
   exEdit=null; exSel=null; exPaySel=EXPAYS[0]; drawExPay(); var now=new Date();
   $('exAmt').value=''; $('exNote').value=''; $('exQty').value=''; $('exLeft').value=''; $('exDate').value=dstr(now); $('exTime').value=tstr(now);
   $('exTitle').textContent='Зарлага бүртгэх'; $('exSave').textContent='Хадгалах';
-  $('exCancel').hidden=true; $('exDel').hidden=true; drawExCats();
+  $('exCancel').hidden=true; $('exDel').hidden=true; $('exClear').hidden=false; drawExCats();
 }
 function drawExList(){
   var rg=range($('exPeriod').value);
@@ -1894,9 +1908,10 @@ $('exList').addEventListener('click',function(ev){
   var e=db.expenses.filter(function(x){return x.id===r.getAttribute('data-exid');})[0]; if(!e) return;
   exEdit=e.id; exSel=e.cat; exPaySel=e.pay||EXPAYS[0]; drawExPay(); $('exLeft').value=e.left>=0&&e.left!==undefined?e.left:''; $('exAmt').value=e.amt; $('exQty').value=e.qty>0?e.qty:''; $('exNote').value=e.note||''; $('exDate').value=e.date; $('exTime').value=e.time||'';
   $('exTitle').textContent='Зарлага засах'; $('exSave').textContent='Засварыг хадгалах';
-  $('exCancel').hidden=false; $('exDel').hidden=false; drawExCats(); window.scrollTo(0,0);
+  $('exCancel').hidden=false; $('exDel').hidden=false; $('exClear').hidden=true; drawExCats(); window.scrollTo(0,0);
 });
 $('exCancel').addEventListener('click',function(){ exReset(); });
+$('exClear').addEventListener('click',function(){ exReset(); window.scrollTo(0,0); toast('Форм цэвэрлэгдлээ'); });
 $('exDel').addEventListener('click',function(){
   if(exEdit) exRemove(exEdit);
 });
@@ -2134,7 +2149,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-03';
+  var APP_VER='2026-11-09';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
