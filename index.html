@@ -483,10 +483,14 @@ body.worker .rec{cursor:default}
   </div>
   <div class="card adm">
     <h2>Байнгын үйлчлүүлэгчийн урамшуулал</h2>
-    <label class="chk"><input type="checkbox" id="loyOn"> Урамшуулал идэвхтэй</label>
+    <label class="chk"><input type="checkbox" id="loyOn"> Урамшуулал идэвхтэй (оноогоор)</label>
     <div class="row" style="align-items:center;margin-top:var(--s3)">
-      <div style="flex:2">Хэд дэх угаалга нь үнэгүй вэ?</div>
-      <div><input id="loyN" type="number" inputmode="numeric" min="2" max="50" step="1"></div>
+      <div style="flex:2">1 оноо хэдэн ₮ вэ?</div>
+      <div><input id="ptRate" type="number" inputmode="numeric" min="100" step="100"></div>
+    </div>
+    <div class="row" style="align-items:center;margin-top:var(--s2)">
+      <div style="flex:2">Хэдэн удаа төлсний дараа 1 үнэгүй вэ?</div>
+      <div><input id="loyN" type="number" inputmode="numeric" min="1" max="50" step="1"></div>
     </div>
     <div class="hint" id="loyHint"></div>
   </div>
@@ -629,7 +633,7 @@ function defaults(){
     pin:null,
     pct:{},          /* ажилтны нэр -> цалингийн хувь */
     freePct:true,    /* үнэгүй угаалгад жинхэнэ үнээр хувь бодох */
-    loyOn:true, loyN:10,
+    loyOn:true, loyN:11, loyPaid:10, ptRate:1000,
     extNotes:{},     /* гол утаснаас ирсэн машин бүрийн сүүлийн тэмдэглэлүүд */
     ext:[],          /* гол утаснаас ирсэн үйлчлүүлэгчийн угаалгын товч жагсаалт */
     extAt:null,
@@ -667,6 +671,9 @@ function normalize(d){
   if(typeof d.freePct!=='boolean') d.freePct=true;
   if(typeof d.loyOn!=='boolean') d.loyOn=true;
   if(!(d.loyN>=2)) d.loyN=10;
+  /* Оноон урамшуулал: N удаа төлсөн хэмжээгээр 1 үнэгүй (10+1) */
+  if(!(d.loyPaid>=1)) d.loyPaid=(d.loyN&&d.loyN!==10)?d.loyN-1:10;
+  if(!(d.ptRate>=1)) d.ptRate=1000;
   if(!('extAt' in d)) d.extAt=null;
   if(!('lastSent' in d)) d.lastSent=null;
   if(!Array.isArray(d.extras)) d.extras=b.extras;
@@ -745,11 +752,11 @@ function visits(pk){
   db.records.forEach(function(r){
     if(plateKey(r.plate)!==pk) return; seen[r.id]=1;
     if(r.del||db.dupIds[r.id]||r.own) return;
-    out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service});
+    out.push({id:r.id,date:r.date,time:r.time,free:!!r.free,service:r.service,v:+r.price||0,u:spentPts(r)});
   });
   db.ext.forEach(function(e){
     if(!e||e.p!==pk||seen[e.i]||db.dupIds[e.i]) return; seen[e.i]=1;
-    out.push({id:e.i,date:e.d,time:e.t,free:!!e.f,service:e.s||''});
+    out.push({id:e.i,date:e.d,time:e.t,free:!!e.f,service:e.s||'',v:+e.v||0,u:+e.u||0});
   });
   return out.sort(function(a,b){return (a.date+a.time).localeCompare(b.date+b.time);});
 }
@@ -783,10 +790,13 @@ $('pNotes').addEventListener('click',function(e){
   if(e.target.id!=='notesMore') return;
   notesOpen=!notesOpen; drawNotes(plateKey($('plate').value));
 });
+/* Үнэгүй угаалгын оноо = үнэ × (хэдэн удаа төлөх) / (1 онооны ₮) */
+function ptCost(price){ return Math.ceil((+price||0)*db.loyPaid/db.ptRate); }
+function spentPts(r){ if(!r.free) return 0; return r.pts>0?+r.pts:ptCost(r.list); }
 function loyalty(pk,exceptId){
-  var v=visits(pk).filter(function(x){return x.id!==exceptId;}), n=0;
-  v.forEach(function(x){ n = x.free ? 0 : n+1; });
-  return {total:v.length, last:v[v.length-1]||null, n:n, due:db.loyOn && n>=db.loyN-1};
+  var v=visits(pk).filter(function(x){return x.id!==exceptId;});
+  var earned=v.reduce(function(a,x){return a+x.v/db.ptRate;},0), spent=v.reduce(function(a,x){return a+(+x.u||0);},0);
+  return {total:v.length, last:v[v.length-1]||null, bal:Math.max(0,Math.floor(earned-spent+1e-9))};
 }
 
 /* ---------- add / edit form ---------- */
@@ -913,7 +923,10 @@ function pickSvc(s){
   sel.svcId=s.id; sel.svc=svcLabel(s);
   /* Шинэ бүртгэлд төрөл сонгох мөчийн огноо, цагийг авна (засвар хийхэд хуучин цаг хэвээр) */
   if(!editId){ var n=new Date(); $('date').value=dstr(n); $('time').value=tstr(n); }
+  if(sel.free){ var pk=plateKey($('plate').value), L=pk.length>=4?loyalty(pk,editId):null;
+    if(L&&L.bal<ptCost(s.price)){ sel.free=false; toast('Энэ угаалгад оноо хүрэлцэхгүй'); } }
   recalcPrice();
+  if(plateKey($('plate').value).length>=4) drawPlateInfo();
 }
 /* ---------- нэмэлт үйлчилгээ ---------- */
 function xSum(list){ return (list||[]).reduce(function(a,x){return a+(+x.p||0);},0); }
@@ -1053,28 +1066,33 @@ function drawPlateInfo(){
 }
 function drawPromo(L){
   if(sel.own){ $('promo').className='promo'; $('promo').innerHTML=''; return; }
-  var box=$('promo'), N=db.loyN;
+  var box=$('promo');
   if(sel.free){
+    var fc=ptCost(basePrice());
     box.className='promo on used';
-    box.innerHTML='<div class="pt">Урамшууллын үнэгүй угаалга сонгогдсон</div>'+
+    box.innerHTML='<div class="pt">Оноогоор үнэгүй угаалга · '+fc+' оноо хасагдана</div>'+
+      (L?'<div class="hint" style="margin-top:2px">Үлдэх оноо: '+Math.max(0,L.bal-fc)+'</div>':'')+
       '<button type="button" class="btn ghost" id="promoOff">Болих, үнэтэй болгох</button>';
     return;
   }
-  if(!L||!db.loyOn){box.className='promo';box.innerHTML='';return;}
-  if(L.due){
+  if(!L||!db.loyOn||!L.total){box.className='promo';box.innerHTML='';return;}
+  var bp=sel.svcId?basePrice():0, cost=bp?ptCost(bp):0;
+  /* Аль төрлийг үнэгүй авч болохыг харуулна (бүлэг бүрийн хамгийн хямд төрлөөр) */
+  var seen={}, can=[];
+  db.services.forEach(function(x){ var k=x.g||x.name; if(L.bal>=ptCost(x.price)&&!seen[k]){ seen[k]=1; can.push(k); } });
+  var ref=cost||Math.min.apply(null,db.services.map(function(x){return ptCost(x.price);}).concat([Infinity]));
+  var pct=ref&&isFinite(ref)?Math.min(100,Math.round(L.bal/ref*100)):0;
+  var head='<div class="pt" style="color:var(--text)">'+L.bal+' оноо</div>';
+  if(cost&&L.bal>=cost){
     box.className='promo on';
-    box.innerHTML='<div class="pt">Энэ бол '+N+' дахь угаалга. Үнэгүй!</div>'+
-      '<div class="hint" style="margin-top:2px">Өмнөх урамшууллаас хойш '+L.n+' удаа төлбөртэй угаалгасан.</div>'+
-      '<button type="button" class="btn" id="promoOn">Үнэгүй болгох</button>';
+    box.innerHTML=head+'<div class="hint" style="margin-top:2px">Энэ угаалгыг ('+money(bp)+') оноогоор үнэгүй авах боломжтой: '+cost+' оноо</div>'+
+      '<button type="button" class="btn" id="promoOn">Оноогоор үнэгүй болгох</button>';
     return;
   }
-  if(L.n>0){
-    var dots=''; for(var i=0;i<N-1;i++) dots+='<i'+(i<L.n?' class="f"':'')+'></i>';
-    box.className='promo on';
-    box.innerHTML='<div class="hint" style="margin:0">Урамшуулал хүртэл '+(N-1-L.n)+' угаалга үлдлээ ('+L.n+'/'+(N-1)+')</div><div class="dots">'+dots+'</div>';
-    return;
-  }
-  box.className='promo'; box.innerHTML='';
+  box.className='promo on';
+  box.innerHTML=head+'<div class="dots" style="display:block;height:6px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:6px"><i style="display:block;height:100%;width:'+pct+'%;background:var(--ok);border:0;border-radius:3px"></i></div>'+
+    '<div class="hint" style="margin-top:4px">'+(cost?'Энэ угаалгыг үнэгүй авахад '+(cost-L.bal)+' оноо дутуу ('+cost+' оноо)':
+      (can.length?'Үнэгүй авах боломжтой: '+esc(can.join(', ')):'Хамгийн хямд угаалга хүртэл '+(isFinite(ref)?ref-L.bal:0)+' оноо дутуу'))+'</div>';
 }
 $('promo').addEventListener('click',function(e){
   if(e.target.id==='promoOn'){ sel.free=true; recalcPrice(); if(!sel.svcId&&!sel.xs.length) $('price').value=0; drawPlateInfo(); toast('Үнэгүй угаалга'); }
@@ -1109,7 +1127,7 @@ $('saveBtn').addEventListener('click',function(){
   if(sel.wrk&&sel.co.length) rec.workers=[sel.wrk].concat(sel.co);
   var xs=sel.xOld||xSel();
   if(xs.length){ rec.extras=xs; rec.base=Math.max(0,rec.price-xSum(xs)); }
-  if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); }
+  if(sel.free){ rec.free=true; rec.list=(old&&old.free&&old.service===sel.svc&&old.list)?old.list:svcPrice(sel.svc); rec.pts=(old&&old.free&&old.service===sel.svc&&old.pts)?old.pts:ptCost(rec.list); }
   if(sel.own){ rec.own=true; rec.list=price; rec.price=0; delete rec.free; delete rec.split; if(rec.extras) rec.base=Math.max(0,price-xSum(rec.extras)); }
   if(!editId){
     var pk=plateKey(plate), m=mins(rec.time);
@@ -1353,8 +1371,8 @@ function drawSettings(){
       '<input class="pr" style="max-width:76px" data-wp="'+i+'" type="number" inputmode="numeric" min="0" max="100" value="'+pctOf(w)+'"><span>%</span>'+
       '<button class="x" data-wx="'+i+'" aria-label="Устгах">×</button></div>';}).join('');
   $('freePct').checked=db.freePct;
-  $('loyOn').checked=db.loyOn; $('loyN').value=db.loyN;
-  $('loyHint').textContent=db.loyOn?('Машин бүрийн '+(db.loyN-1)+' төлбөртэй угаалгын дараах '+db.loyN+' дахь нь үнэгүй.'+
+  $('loyOn').checked=db.loyOn; $('loyN').value=db.loyPaid; $('ptRate').value=db.ptRate;
+  $('loyHint').textContent=db.loyOn?(money(db.ptRate)+' = 1 оноо. Үнэгүй угаалга = тухайн угаалгын үнэ × '+db.loyPaid+' / '+db.ptRate+' оноо ('+db.loyPaid+'+1). Жишээ: 30,000₮ угаалга = '+ptCost(30000)+' оноо.'+
     (db.extAt?' Үндсэн утасны мэдээ: '+String(db.extAt).slice(0,10):'')):'Урамшуулал унтраалттай.';
   $('devName').value=db.device;
   var un=db.records.filter(function(r){return !r.sent;}).length;
@@ -1430,8 +1448,12 @@ $('wrkSet').addEventListener('change',function(e){
 $('freePct').addEventListener('change',function(){db.freePct=this.checked;save();});
 $('loyOn').addEventListener('change',function(){db.loyOn=this.checked;save();drawSettings();drawPlateInfo();});
 $('loyN').addEventListener('change',function(){
-  var v=Math.round(parseFloat(this.value)); if(!(v>=2)) v=2; if(v>50) v=50;
-  db.loyN=v; save(); drawSettings(); drawPlateInfo();
+  var v=Math.round(parseFloat(this.value)); if(!(v>=1)) v=1; if(v>50) v=50;
+  db.loyPaid=v; db.loyN=v+1; save(); drawSettings(); drawPlateInfo();
+});
+$('ptRate').addEventListener('change',function(){
+  var v=Math.round(parseFloat(this.value)); if(!(v>=1)) v=1000;
+  db.ptRate=v; save(); drawSettings(); drawPlateInfo();
 });
 $('wrkSet').addEventListener('click',function(e){
   var b=e.target.closest('[data-wx]'); if(!b) return;
@@ -1602,6 +1624,8 @@ function mergeFile(d,res,had,setOK){
     }
     if(typeof d.loyOn==='boolean') db.loyOn=d.loyOn;
     if(d.loyN>=2) db.loyN=Math.round(d.loyN);
+    if(d.loyPaid>=1) db.loyPaid=Math.round(d.loyPaid);
+    if(d.ptRate>=1) db.ptRate=Math.round(d.ptRate);
     if(d.kind==='backup'){
       ['pct','freePct','ext','extNotes','extAt','recv','dupIds','expCats','stock'].forEach(function(k){ if(k in d) db[k]=d[k]; });
       normalize(db);
@@ -1663,10 +1687,10 @@ function custSummary(){
   db.records.forEach(function(r){ if(r.date>=cut) by[plateKey(r.plate)]=1; });
   db.ext.forEach(function(e){ if(e&&e.d>=cut) by[e.p]=1; });
   Object.keys(by).forEach(function(pk){
-    var v=visits(pk), from=0;
-    for(var j=v.length-1;j>=0;j--) if(v[j].free){from=j;break;}
-    v.slice(from).slice(-(db.loyN+1)).forEach(function(x){
-      out.push({i:x.id,p:pk,d:x.date,t:x.time,f:x.free?1:0,s:x.service});
+    visits(pk).forEach(function(x){
+      var o={i:x.id,p:pk,d:x.date,t:x.time,v:x.v};
+      if(x.free){ o.f=1; o.u=x.u; }
+      out.push(o);
     });
   });
   return out;
@@ -1686,7 +1710,7 @@ $('sendSet').addEventListener('click',function(){
   var now=new Date();
   download('ugaalga-tohirgoo-'+dstr(now)+'-'+tstr(now).replace(':','')+'.txt',
     JSON.stringify({app:KEY,kind:'settings',at:dstr(now)+' '+tstr(now),services:db.services,workers:db.workers,extras:db.extras,
-      loyOn:db.loyOn,loyN:db.loyN,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
+      loyOn:db.loyOn,loyN:db.loyN,loyPaid:db.loyPaid,ptRate:db.ptRate,cust:custSummary(),notes:notesSummary(),dup:Object.keys(db.dupIds)}),'text/plain');
 });
 $('devName').addEventListener('change',function(){db.device=this.value.trim();save();});
 $('wipe').addEventListener('click',function(){
@@ -2040,7 +2064,7 @@ function knownDevices(){
 function inviteUrl(){
   var inv={v:1,m:db.device,p:db.pin,
     s:db.services.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),
-    w:db.workers,x:db.extras.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,u:knownDevices(),at:dstr(new Date())};
+    w:db.workers,x:db.extras.map(function(x){return x.g?[x.id,x.name,x.price,x.g]:[x.id,x.name,x.price];}),lo:db.loyOn?1:0,ln:db.loyN,lp:db.loyPaid,pr:db.ptRate,u:knownDevices(),at:dstr(new Date())};
   return location.origin+location.pathname+'#join='+b64e(JSON.stringify(inv));
 }
 function parseInvite(str){
@@ -2060,6 +2084,8 @@ function applyInvite(d){
   if(Array.isArray(d.x)) db.extras=d.x.filter(function(x){return Array.isArray(x)&&x[1];}).map(function(x){return {id:String(x[0]||uid()),name:String(x[1]),price:parseFloat(x[2])||0,g:typeof x[3]==='string'?x[3]:''};});
   if(d.lo===0||d.lo===1) db.loyOn=!!d.lo;
   if(d.ln>=2) db.loyN=Math.round(d.ln);
+  if(d.lp>=1) db.loyPaid=Math.round(d.lp);
+  if(d.pr>=1) db.ptRate=Math.round(d.pr);
   if(typeof d.p==='string') db.pin=d.p;
   sel.wrk=null; sel.co=[];
 }
@@ -2154,7 +2180,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-10';
+  var APP_VER='2026-11-10b';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
