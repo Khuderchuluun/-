@@ -909,7 +909,12 @@ $('svcChips').addEventListener('click',function(e){
     openGrp=(openGrp===gname?null:gname); wrkOpen=false; if(openXGrp){ openXGrp=null; drawExtras(); } drawChips();
   }
 });
-function pickSvc(s){ sel.svcId=s.id; sel.svc=svcLabel(s); recalcPrice(); }
+function pickSvc(s){
+  sel.svcId=s.id; sel.svc=svcLabel(s);
+  /* Шинэ бүртгэлд төрөл сонгох мөчийн огноо, цагийг авна (засвар хийхэд хуучин цаг хэвээр) */
+  if(!editId){ var n=new Date(); $('date').value=dstr(n); $('time').value=tstr(n); }
+  recalcPrice();
+}
 /* ---------- нэмэлт үйлчилгээ ---------- */
 function xSum(list){ return (list||[]).reduce(function(a,x){return a+(+x.p||0);},0); }
 function xSel(){ return db.extras.filter(function(x){return sel.xs.indexOf(x.id)>=0;}).map(function(x){return {id:x.id,n:svcLabel(x),p:+x.price||0,g:x.g||''};}); }
@@ -2149,7 +2154,7 @@ resetForm(); exReset(); refreshAll(); applyRole(); checkJoinHash();
 </script>
 <script>
 (function(){
-  var APP_VER='2026-11-09';
+  var APP_VER='2026-11-10';
   var vd=document.createElement('div'); vd.className='hint'; vd.style.cssText='text-align:center;margin:4px 0 12px';
   vd.textContent='Аппын хувилбар: '+APP_VER;
   document.getElementById('p-set').appendChild(vd);
